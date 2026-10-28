@@ -1,0 +1,165 @@
+# Builds Flavour Atlas on a cloud Mac, signs it and uploads it to App Store Connect.
+# Run it from GitHub: Actions › "Build and upload to App Store" › Run workflow.
+name: Build and upload to App Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        default: build and upload
+        options:
+          - build and upload
+          - submit latest build for review
+      version:
+        description: App version shown on the App Store
+        type: string
+        default: "1.0"
+      upload_listing:
+        description: Also upload listing text and screenshots
+        type: boolean
+        default: true
+
+jobs:
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      APP_ID: com.maneksingh.flavouratlas
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check setup
+        run: |
+          missing=""
+          [ -z "$APPLE_TEAM_ID" ] && missing="$missing APPLE_TEAM_ID"
+          [ -z "$ASC_KEY_ID" ] && missing="$missing ASC_KEY_ID"
+          [ -z "$ASC_ISSUER_ID" ] && missing="$missing ASC_ISSUER_ID"
+          [ -z "$ASC_KEY_P8" ] && missing="$missing ASC_KEY_P8"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing. Follow step 4 in SETUP.md."
+            exit 1
+          fi
+          xcodebuild -version
+          major=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
+          if [ "$major" -lt 26 ]; then echo "::error::Apple needs Xcode 26 or later; this runner has Xcode $major."; exit 1; fi
+
+      - name: App Store Connect key
+        run: |
+          mkdir -p "$HOME/private_keys"
+          KEY_PATH="$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY_PATH"
+          echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import json, os
+          json.dump({"key_id": os.environ["ASC_KEY_ID"], "issuer_id": os.environ["ASC_ISSUER_ID"],
+                     "key": open(os.path.expanduser("~/private_keys/AuthKey_%s.p8" % os.environ["ASC_KEY_ID"])).read(),
+                     "in_house": False}, open(os.path.join(os.environ["RUNNER_TEMP"], "api_key.json"), "w"))
+          PY
+
+      - uses: actions/setup-node@v4
+        if: inputs.action == 'build and upload'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build the app bundle
+        if: inputs.action == 'build and upload'
+        run: |
+          npm ci
+          npm run build
+          npx cap sync ios
+
+      - name: Archive (signed by Apple's cloud signing)
+        if: inputs.action == 'build and upload'
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            PRODUCT_BUNDLE_IDENTIFIER="$APP_ID" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            archive
+
+      - name: Upload to App Store Connect
+        if: inputs.action == 'build and upload'
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "### Uploaded version $VERSION (build ${{ github.run_number }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "It appears in App Store Connect › TestFlight after Apple processes it (about 15–30 minutes)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install fastlane
+        if: inputs.upload_listing || inputs.action == 'submit latest build for review'
+        run: which fastlane || sudo gem install fastlane --no-document
+
+      - name: Upload listing text and screenshots
+        if: inputs.upload_listing && inputs.action == 'build and upload'
+        run: |
+          OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          REPO="${GITHUB_REPOSITORY#*/}"
+          echo "https://$OWNER.github.io/$REPO/" > fastlane/metadata/en-CA/support_url.txt
+          echo "https://$OWNER.github.io/$REPO/privacy.html" > fastlane/metadata/en-CA/privacy_url.txt
+          fastlane deliver \
+            --api_key_path "$RUNNER_TEMP/api_key.json" \
+            --app_identifier "$APP_ID" \
+            --app_version "$VERSION" \
+            --skip_binary_upload true \
+            --metadata_path fastlane/metadata \
+            --screenshots_path fastlane/screenshots \
+            --overwrite_screenshots true \
+            --run_precheck_before_submit false \
+            --force true
+
+      - name: Submit for App Review
+        if: inputs.action == 'submit latest build for review'
+        run: |
+          fastlane deliver \
+            --api_key_path "$RUNNER_TEMP/api_key.json" \
+            --app_identifier "$APP_ID" \
+            --app_version "$VERSION" \
+            --skip_binary_upload true \
+            --skip_metadata true \
+            --skip_screenshots true \
+            --submit_for_review true \
+            --automatic_release true \
+            --submission_information '{"add_id_info_uses_idfa": false}' \
+            --run_precheck_before_submit false \
+            --force true
+          echo "### Submitted version $VERSION for App Review" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up key
+        if: always()
+        run: rm -rf "$HOME/private_keys" "$RUNNER_TEMP/api_key.json"

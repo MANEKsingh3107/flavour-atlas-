@@ -1,0 +1,8 @@
+node_modules/
+ios/App/App/public/
+ios/DerivedData/
+*.xcuserstate
+www/
+*.p8
+api_key.json
+.DS_Store

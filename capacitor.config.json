@@ -1,0 +1,24 @@
+{
+  "appId": "com.maneksingh.flavouratlas",
+  "appName": "Flavour Atlas",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#EEEEE8",
+    "scrollEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": false,
+      "backgroundColor": "#EEEEE8",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "overlaysWebView": true
+    },
+    "LocalNotifications": {
+      "iconColor": "#A92D4C"
+    }
+  }
+}

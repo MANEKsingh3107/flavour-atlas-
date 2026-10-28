@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#EEEEE8">
+<title>Flavour Atlas</title>
+<!--FONTS-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<!--/FONTS-->
+<style>
+/* Layout idea: a kitchen pass. Browse the larder on the left, build a "ticket" of ingredients, fire random combinations. */
+:root{
+  --paper:#EEEEE8;
+  --surface:#FFFFFF;
+  --ink:#1B2325;
+  --muted:#5B6668;
+  --line:#D6D8D0;
+  --accent:#A92D4C;
+  --accent-soft:#F4DCE2;
+  --herb:#3C6B47;
+  --herb-soft:#DCEBDD;
+  --display:'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
+  --body:'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mono:'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --radius:10px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111617; --surface:#1A2123; --ink:#E7E9E3; --muted:#9AA4A3; --line:#2D3739;
+    --accent:#E3678A; --accent-soft:#3A1F28; --herb:#86B892; --herb-soft:#1F3226;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111617; --surface:#1A2123; --ink:#E7E9E3; --muted:#9AA4A3; --line:#2D3739;
+  --accent:#E3678A; --accent-soft:#3A1F28; --herb:#86B892; --herb-soft:#1F3226;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-0.01em}
+.mono{font-family:var(--mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+
+html{-webkit-tap-highlight-color:transparent}
+button{-webkit-user-select:none;user-select:none;touch-action:manipulation}
+body.locked{overflow:hidden}
+/* Top bar */
+.top{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+.top-inner{max-width:1240px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:24px}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{font-size:24px;font-weight:800}
+.brand span{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.tabs{display:flex;gap:4px;margin-left:auto}
+.tab{background:none;border:1px solid transparent;border-radius:999px;padding:7px 14px;font-weight:500;color:var(--muted)}
+.tab:hover{color:var(--ink)}
+.tab[aria-current="page"]{background:var(--ink);color:var(--paper)}
+.tab .count{font-family:var(--mono);font-size:11px;margin-left:6px;opacity:.75}
+
+main{max-width:1240px;margin:0 auto;padding:20px 20px calc(100px + env(safe-area-inset-bottom))}
+.view{display:none}
+.view.on{display:block}
+
+/* Explore */
+.explore{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:24px;align-items:start}
+.filters{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+.search{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--ink);font:inherit;font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip.season[aria-pressed="true"]{background:var(--herb);border-color:var(--herb);color:var(--surface)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--c,#999);flex:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.tile{display:flex;align-items:center;gap:8px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0}
+.tile:hover{border-color:var(--muted)}
+.tile[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tname{flex:1;min-width:0;overflow-wrap:anywhere}
+.tcount{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.resultline{display:flex;justify-content:space-between;align-items:center;margin:2px 0 8px}
+
+.detail{position:sticky;top:76px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;max-height:calc(100vh - 100px);overflow:auto}
+.detail h2{font-size:38px;font-weight:800;line-height:1.05}
+.dhead{display:flex;flex-direction:column;gap:10px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:4px;background:var(--paper);color:var(--muted)}
+.tag.in{background:var(--herb-soft);color:var(--herb)}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:8px;padding:9px 14px;font-weight:600;font-size:14px}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--ink)}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.sec{padding-top:16px;display:flex;flex-direction:column;gap:10px}
+.sec h3{font-size:17px;font-weight:700;display:flex;align-items:baseline;gap:8px}
+.sec h3 .mono{font-weight:400}
+.pairs{display:flex;flex-wrap:wrap;gap:6px}
+.pchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px 5px 9px;font-size:14px}
+.pchip:hover{border-color:var(--ink)}
+.pchip.classic{background:var(--accent-soft);border-color:transparent;font-weight:600}
+.pchip.classic:hover{border-color:var(--accent)}
+.pchip small{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.note{border-left:3px solid var(--accent);padding:4px 0 4px 12px;font-size:14px}
+.note b{font-weight:600}
+.back{display:none}
+
+/* Ticket (combine) */
+.combine{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:24px;align-items:start}
+.ticket{background:var(--surface);border:1px solid var(--line);border-radius:4px 4px 14px 14px;position:relative;padding:20px 20px 18px;box-shadow:0 1px 0 var(--line)}
+.ticket::before{content:"";position:absolute;left:0;right:0;top:-1px;height:6px;background:radial-gradient(circle at 6px -2px,var(--paper) 5px,transparent 5.5px) repeat-x;background-size:12px 6px}
+.thead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:10px}
+.titems{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.titem{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.titem .num{font-family:var(--mono);font-size:12px;color:var(--muted);width:20px}
+.titem .nm{flex:1;font-family:var(--display);font-size:20px;font-weight:700;background:none;border:0;text-align:left;padding:0}
+.titem .nm:hover{color:var(--accent)}
+.x{background:none;border:1px solid var(--line);border-radius:6px;width:28px;height:28px;color:var(--muted);font-size:16px;line-height:1}
+.x:hover{color:var(--accent);border-color:var(--accent)}
+.adder{position:relative;margin-top:12px}
+.sugg{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.empty{color:var(--muted);font-size:14px;padding:14px 0}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.score{display:flex;align-items:center;gap:16px}
+.score .big{font-family:var(--display);font-size:46px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.score .big small{font-size:18px;color:var(--muted);font-weight:500}
+.plist{display:flex;flex-direction:column;gap:4px}
+.prow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.prow:last-child{border-bottom:0}
+.pill{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.pill.classic{background:var(--accent);color:#fff}
+.pill.good{background:var(--herb-soft);color:var(--herb)}
+.pill.none{background:var(--paper);color:var(--muted);border:1px dashed var(--line)}
+.balance{display:grid;grid-template-columns:repeat(9,1fr);gap:4px}
+.bal{display:flex;flex-direction:column;gap:5px;align-items:stretch;text-align:center}
+.bal i{display:block;height:28px;border-radius:5px;background:var(--paper);border:1px dashed var(--line)}
+.bal.on i{background:var(--herb);border:1px solid var(--herb)}
+.bal span{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);overflow-wrap:anywhere;line-height:1.2}
+.bal.on span{color:var(--ink)}
+.fix{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
+.fix b{font-weight:600;min-width:84px}
+.addchip{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--muted);background:transparent;border-radius:999px;padding:4px 10px 4px 8px;font-size:13px}
+.addchip:hover{border-style:solid;border-color:var(--accent);color:var(--accent)}
+.addchip em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+/* Spark */
+.spark{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+.controls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:16px}
+.ctl{display:flex;flex-direction:column;gap:5px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:8px 12px;font-size:14px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);max-width:220px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.card-top{padding:22px 24px;display:flex;flex-direction:column;gap:16px;border-bottom:1px solid var(--line)}
+.combo-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;font-family:var(--display);font-weight:800;font-size:clamp(28px,4.6vw,46px);line-height:1.05}
+.combo-line .plus{color:var(--accent);font-weight:500}
+.combo-line button{background:none;border:0;padding:0;font:inherit;text-align:left}
+.combo-line button:hover{text-decoration:underline;text-decoration-thickness:3px;text-decoration-color:var(--accent)}
+.prompt{font-size:17px}
+.prompt b{color:var(--accent);font-weight:600}
+.why{padding:18px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.why .sub{display:flex;flex-direction:column;gap:8px}
+.wrow{font-size:14px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.wrow .pill{flex:none}
+.wild{color:var(--accent);font-family:var(--mono);font-size:11px;text-transform:uppercase}
+.card-actions{padding:14px 24px 20px;display:flex;flex-wrap:wrap;gap:8px}
+.hist{display:flex;flex-direction:column;gap:6px}
+.hbtn{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px}
+.hbtn:hover{border-color:var(--ink)}
+.hbtn small{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px}
+
+/* Saved */
+.saved{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.scard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.scard h3{font-size:20px;line-height:1.15}
+.scard p{margin:0;font-size:14px;color:var(--muted)}
+
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.intro{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.intro h2{font-size:28px;font-weight:800}
+.intro p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.legend{display:flex;gap:12px;align-items:center;font-size:13px;color:var(--muted);flex-wrap:wrap}
+
+/* Sheets and forms */
+.sheet{position:fixed;inset:0;z-index:60;background:rgba(10,14,15,.5);display:flex;align-items:flex-end;justify-content:center;padding:12px}
+.sheet[hidden]{display:none}
+.sheet-card{background:var(--surface);color:var(--ink);width:100%;max-width:560px;max-height:calc(100% - 24px - env(safe-area-inset-top));overflow:auto;border-radius:18px;padding:20px 20px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+@media (min-width:700px){.sheet{align-items:center}.sheet-card{padding-bottom:20px}}
+.sh-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sh-head h2{font-size:26px;font-weight:800}
+.field{display:flex;flex-direction:column;gap:7px}
+textarea{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--ink);resize:vertical;width:100%}
+.fpair{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 10px;font-size:14px}
+.fpair.classic{background:var(--accent-soft);border-color:transparent}
+.fpair button{border:0;background:var(--paper);border-radius:999px;padding:3px 9px;font-family:var(--mono);font-size:11px}
+.fpicked{display:flex;align-items:center;gap:10px;font-size:20px;font-family:var(--display);font-weight:700}
+.btn.sm{padding:5px 10px;font-size:13px}
+.mine{font-family:var(--mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.book{display:flex;flex-direction:column;gap:30px}
+.bh{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bh h3{font-size:21px;font-weight:800}
+.list{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.lrow{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:15px;flex-wrap:wrap}
+.lrow:last-child{border-bottom:0}
+.lrow .grow{flex:1;min-width:0}
+.lrow .sub{color:var(--muted);font-size:13px}
+.hint{margin:0;color:var(--muted);font-size:14px;max-width:62ch}
+@media (max-width:900px){
+  .explore,.combine,.spark{grid-template-columns:minmax(0,1fr)}
+  .detail{position:static;max-height:none}
+  .explore.has-sel .browse{display:none}
+  .explore:not(.has-sel) .detail{display:none}
+  .back{display:inline-flex}
+  .tabs{position:fixed;left:0;right:0;bottom:0;margin:0;background:var(--surface);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom));justify-content:space-around;z-index:30}
+  .tab{padding:8px 10px;font-size:14px}
+  .detail h2{font-size:32px}
+}
+@media (max-width:480px){
+  main{padding:16px 16px calc(100px + env(safe-area-inset-bottom))}
+  .brand span{display:none}
+  .top-inner{padding:12px 16px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .balance{grid-template-columns:repeat(5,1fr)}
+  .card-top,.why,.card-actions{padding-left:18px;padding-right:18px}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><h1>Flavour Atlas</h1><span id="statline"></span></div>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab" data-view="explore" id="tab-explore">Explore</button>
+      <button class="tab" data-view="combine" id="tab-combine">Combo<span class="count" id="ticketCount"></span></button>
+      <button class="tab" data-view="spark" id="tab-spark">Spark</button>
+      <button class="tab" data-view="saved" id="tab-saved">My book<span class="count" id="savedCount"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- EXPLORE -->
+  <section class="view" id="view-explore">
+    <div class="explore" id="explore">
+      <div class="browse">
+        <div class="filters">
+          <input class="search" id="q" type="search" placeholder="Search an ingredient: beetroot, miso, cilantro…" autocomplete="off" aria-label="Search ingredients">
+          <div class="chips" id="cats"></div>
+        </div>
+        <div class="resultline"><span class="mono" id="resultCount"></span><button class="btn ghost sm" data-newing>+ Your own ingredient</button></div>
+        <div class="grid" id="grid"></div>
+      </div>
+      <aside class="detail" id="detail" aria-live="polite"></aside>
+    </div>
+  </section>
+
+  <!-- COMBINE -->
+  <section class="view" id="view-combine">
+    <div class="intro">
+      <div><h2>Combo builder</h2><p>Stack ingredients on the ticket. See how every pair gets along, what's missing for balance, and what else fits all of them.</p></div>
+    </div>
+    <div class="combine">
+      <div class="ticket">
+        <div class="thead"><span class="mono" id="ticketHead">Ticket</span><button class="btn ghost" id="clearTicket" style="padding:5px 10px;font-size:13px">Clear</button></div>
+        <ul class="titems" id="titems"></ul>
+        <div class="adder">
+          <input class="search" id="addq" type="search" placeholder="Add an ingredient…" autocomplete="off" aria-label="Add an ingredient to the ticket">
+          <div class="sugg" id="addsugg"></div>
+        </div>
+        <div class="actions" style="margin-top:14px">
+          <button class="btn accent" id="addBest">Add best match</button>
+          <button class="btn ghost" id="saveTicket">Save</button>
+          <button class="btn ghost" id="copyTicket">Copy</button>
+        </div>
+      </div>
+      <div class="stack" id="analysis"></div>
+    </div>
+  </section>
+
+  <!-- SPARK -->
+  <section class="view" id="view-spark">
+    <div class="intro">
+      <div><h2>Spark</h2><p>Random combinations pulled from the pairing map, with a technique and a format to push you. Lock a hero ingredient or let it roll.</p></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label class="mono" for="hero">Hero</label>
+        <select id="hero"><option value="">Any ingredient</option></select></div>
+      <div class="ctl"><span class="mono">Ingredients</span>
+        <div class="seg" id="sizeSeg"><button data-size="3">3</button><button data-size="4">4</button><button data-size="5">5</button></div></div>
+      <div class="ctl"><span class="mono">Style</span>
+        <div class="seg" id="modeSeg"><button data-mode="classic">Classic</button><button data-mode="balanced">Balanced</button><button data-mode="wild">Wild</button></div></div>
+      <div class="ctl"><span class="mono">Season</span>
+        <div class="seg" id="seasonSeg"><button data-s="any">Any</button><button data-s="now">In season</button></div></div>
+      <button class="btn accent" id="fire" style="padding:11px 20px;font-size:15px">Spark another</button>
+    </div>
+    <div class="spark">
+      <div id="sparkCard"></div>
+      <aside class="stack">
+        <div class="mono">Recent sparks</div>
+        <div class="hist" id="hist"></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- SAVED -->
+  <section class="view" id="view-saved">
+    <div class="intro"><div><h2>My book</h2><p>Your saved combos, your own ingredients and pairings. Everything stays on this device; back it up below.</p></div></div>
+    <div class="book" id="book"></div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+<div class="sheet" id="sheet" hidden><div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" id="sheetBody"></div></div>
+
+<script>
+/* ---------- DATA ----------
+   name | category | taste tags | season | pairings (* = classic) | search aliases
+   Pairings are merged both ways, so each match only needs listing once. */
+const CATS = {
+  V:{n:'Vegetables',c:'#4E8C4A'}, M:{n:'Mushrooms',c:'#8C6A50'}, A:{n:'Alliums & roots',c:'#8C5CA8'},
+  H:{n:'Herbs',c:'#2B8C7B'}, F:{n:'Fruit',c:'#D4553A'}, S:{n:'Spices',c:'#C9922A'},
+  P:{n:'Plant proteins',c:'#4B6FA8'}, G:{n:'Grains & legumes',c:'#8A8F3C'}, N:{n:'Nuts & seeds',c:'#A06A3A'},
+  D:{n:'Dairy & egg',c:'#B9A23A'}, K:{n:'Pantry & sweet',c:'#7E5A6C'}
+};
+const RAW = `
+tomato|V|sweet sour umami|su au|basil*, olive oil*, garlic*, mozzarella*, oregano, feta, cucumber, red onion, balsamic, chili, cumin, ginger, strawberry, watermelon, peach, chickpea, caper, olive, tarragon, coriander leaf, egg, smoked paprika, miso, sumac, fennel, saffron|tomatoes, heirloom
+corn|V|sweet crunch|su|butter*, lime*, chili*, coriander leaf, basil, miso*, parmesan, tomato, black bean*, smoked paprika, honey, blueberry, chive, feta, brown butter, coconut, tarragon, peach, chanterelle|sweetcorn, maize
+asparagus|V|bitter fresh|sp|egg*, butter*, lemon*, parmesan*, mint, tarragon, peas, morel*, hazelnut, miso, chervil, orange, ramp, ricotta, brown butter, almond|
+peas|V|sweet fresh|sp su|mint*, butter*, ricotta, lemon, tarragon, parmesan, asparagus, broad bean, shallot, lettuce*, chili, ginger, coconut, cumin, chive, morel, paneer*, rice|green peas, snap peas
+broad bean|V|sweet bitter|sp su|mint*, pecorino*, lemon, olive oil, garlic, dill, peas, ricotta, cumin, chili, feta, artichoke|fava, fava bean
+carrot|V|sweet earthy crunch|yr|cumin*, orange*, ginger*, honey, coriander seed, tahini, harissa*, dill, miso, butter, yogurt, cardamom, pistachio, chervil, star anise, maple, sesame|carrots
+beetroot|V|sweet earthy|su au wi|goat cheese*, orange*, horseradish*, dill, walnut, apple, yogurt, cumin, chocolate, raspberry, blackberry, fennel, caraway, balsamic, hazelnut, feta, tarragon, juniper, cider vinegar, rhubarb|beet, beets
+parsnip|V|sweet earthy|au wi|maple*, brown butter, apple, nutmeg, honey, thyme, pear, cardamom, ginger, cumin, parmesan, walnut, vanilla, sage, miso|parsnips
+celeriac|V|earthy fresh|au wi|apple*, mushroom*, hazelnut, mustard*, brown butter, thyme, walnut, lemon, pear, blue cheese, caper, dill, horseradish|celery root
+potato|V|earthy|yr|butter*, rosemary*, garlic*, leek*, chive*, egg, parmesan, dill*, smoked paprika, mustard, caper, crème fraîche, saffron, cumin, cheddar, curry leaf, mustard seed, turmeric, garam masala, horseradish, gruyère, kimchi|potatoes
+sweet potato|V|sweet earthy|au wi|lime, chili*, miso*, maple, coconut, black bean, ginger, cinnamon, tahini, sage, brown butter, smoked paprika, pecan, feta, coriander leaf, peanut, harissa|yam, kumara
+squash|V|sweet earthy|au wi|sage*, brown butter*, maple, chili, parmesan, ricotta, pumpkin seed*, nutmeg, ginger, coconut, miso, apple, pear, hazelnut, chestnut, goat cheese, cinnamon, rosemary, pecan, thyme|butternut, pumpkin, winter squash, delicata, kabocha
+cauliflower|V|bitter earthy|au wi|turmeric*, cumin*, tahini, cheddar*, raisin*, caper, almond, saffron, curry leaf, brown butter, parmesan, chili, pomegranate, garlic, hazelnut, mustard, mustard seed, garam masala, smoked paprika|
+broccoli|V|bitter fresh|au|garlic*, chili*, lemon, parmesan, almond, cheddar, sesame, soy sauce, miso, peanut, ginger, tahini, caper|broccolini, rapini
+brussels sprouts|V|bitter|au wi|chestnut*, brown butter, maple, mustard, apple, pecan, chili, lime, miso, pomegranate, parmesan, balsamic, caper, hazelnut, smoked paprika|sprouts
+cabbage|V|sweet bitter crunch|yr|caraway*, apple*, juniper*, butter, mustard, dill, ginger, chili, sesame, soy sauce, carrot, cumin, cider vinegar*, gochujang, miso, tempeh, jackfruit|savoy, red cabbage, napa
+kale|V|bitter fresh|au wi|garlic*, lemon*, chili, parmesan, tahini, sesame, raisin, pine nut, apple, white bean*, miso, smoked paprika, avocado, walnut|cavolo nero, lacinato
+spinach|V|fresh earthy|sp au|garlic*, nutmeg*, ricotta*, paneer*, lemon, cumin, egg, raisin, pine nut, feta, sesame, chickpea, yogurt, garam masala, lentil|
+eggplant|V|bitter rich|su au|miso*, tahini*, garlic, tomato, chili, mint, yogurt, pomegranate, basil, cumin, sesame, soy sauce, ginger, smoked paprika, oregano, feta, honey, mirin, sumac, harissa|aubergine, brinjal
+zucchini|V|fresh|su|mint*, lemon*, basil, ricotta, parmesan, feta, garlic, dill, chili, tomato, pine nut, almond, oregano, goat cheese|courgette, summer squash
+cucumber|V|fresh crunch|su|dill*, yogurt*, mint*, chili, sesame, rice vinegar*, melon, strawberry, feta, red onion, lime, coriander leaf, watermelon, tomato, shiso*, avocado, sumac, bulgur, radish|
+fennel|V|fresh aromatic crunch|au wi|orange*, olive*, parmesan, apple, lemon, dill, grapefruit, pear, chili, tomato, saffron*, pistachio, white bean, tarragon, walnut|fennel bulb
+bok choy|V|fresh crunch|yr|garlic*, ginger*, soy sauce, sesame, shiitake, chili, miso, tofu|pak choi
+avocado|V|rich|yr|lime*, chili*, coriander leaf*, tomato, grapefruit*, red onion, corn, black bean, sesame, mango, cucumber, radish, feta|
+artichoke|V|bitter earthy|sp|lemon*, garlic, parmesan, mint, olive oil*, broad bean, peas, white bean, butter, thyme, olive, parsley|
+celery|V|fresh bitter crunch|yr|apple*, walnut*, blue cheese*, peanut, cheddar, raisin, carrot, dill|
+green beans|V|fresh crunch|su|garlic, almond*, shallot, tomato, chili, sesame, miso, lemon, tarragon|haricots verts, runner beans
+bell pepper|V|sweet|su au|tomato, garlic, smoked paprika*, olive, feta, basil, almond, walnut*, pomegranate, chickpea, egg, oregano, red onion, caper|capsicum, red pepper
+sunchoke|V|earthy|au wi|hazelnut*, thyme, brown butter*, lemon, mushroom, sage, parmesan, apple, garlic, rosemary|jerusalem artichoke
+lettuce|V|fresh crunch|sp su|peas*, butter, blue cheese, lemon, chive, radish, yogurt, mint, walnut|little gem, romaine
+radicchio|V|bitter crunch|au wi|orange*, honey*, balsamic*, blue cheese, walnut, pear, parmesan, apple, hazelnut, pomegranate, grapefruit|treviso, chicory, endive
+radish|V|heat crunch fresh|sp su|butter*, chive, dill, yogurt, miso, mint, cucumber, lemon, sesame, orange, feta, strawberry|radishes, daikon
+leek|A|sweet aromatic|au wi|butter*, potato*, thyme, mustard, cheddar, gruyère*, egg, mushroom, white bean, tarragon, crème fraîche, hazelnut|leeks
+red onion|A|sweet heat crunch|yr|sumac*, tomato, cucumber, lime, balsamic, thyme, cheddar, orange, chili, coriander leaf, mango|onion
+shallot|A|sweet aromatic|yr|butter*, thyme, mushroom*, tarragon*, peas, chili, sherry vinegar*, green beans|shallots
+garlic|A|heat aromatic|yr|olive oil*, chili*, parsley*, ginger*, rosemary*, thyme, lemon, butter, potato, tomato, mushroom, soy sauce, yogurt, white bean, broccoli, kale, spinach, honey|
+ginger|A|heat fresh aromatic|yr|garlic*, soy sauce*, scallion*, lime, lemongrass*, chili, coconut, carrot, honey, rhubarb*, pear, sesame, miso, turmeric, tofu, orange, sweet potato, mango, chocolate, cardamom, plum, pineapple, melon|
+scallion|A|fresh heat|yr|ginger*, sesame*, soy sauce, chili, tofu*, egg, lime, miso, potato, coriander leaf, peanut, kimchi|spring onion, green onion
+ramp|A|fresh heat|sp|butter*, egg, potato, asparagus, morel*, parmesan, lemon, ricotta, walnut, white bean|wild garlic, wild leek
+lemongrass|A|fresh sour aromatic|yr|ginger*, coconut*, lime*, chili, coriander leaf, tofu, basil, peanut, mango, garlic, mushroom|
+horseradish|A|heat fresh|au wi|beetroot*, apple, celeriac, potato, dill, crème fraîche*, mustard|
+chili|S|heat|su au|lime*, garlic*, tomato, corn, chocolate*, mango*, honey, coriander leaf, ginger, peanut, sesame, watermelon, pineapple*, avocado, broccoli, eggplant, sweet potato, coconut, tofu, black bean|chilli, jalapeño, chile, chili flakes
+mushroom|M|umami earthy|yr|thyme*, garlic*, butter*, soy sauce*, miso, parsley, tarragon, egg, shallot, leek, parmesan, rosemary, sherry vinegar*, hazelnut, celeriac, potato, chestnut*, smoked paprika, tofu, sage, lemon, gruyère, polenta*, seitan|cremini, king oyster, oyster mushroom, maitake
+morel|M|earthy umami|sp|butter*, asparagus*, ramp, peas, egg, crème fraîche*, chive, tarragon, shallot|morels
+shiitake|M|umami smoky|yr|soy sauce*, ginger*, garlic, sesame, scallion, miso, tofu, bok choy, chili, butter, mirin*|
+chanterelle|M|earthy sweet|su au|butter*, thyme, apricot*, egg, shallot, corn, peach, parsley, crème fraîche, hazelnut, chive|girolle
+basil|H|fresh aromatic|su|tomato*, mozzarella*, garlic*, olive oil, pine nut*, lemon, strawberry, peach, parmesan, mint, zucchini, eggplant, coconut, chili, watermelon, corn|thai basil
+mint|H|fresh|su|peas*, yogurt*, cucumber*, lime, chocolate*, watermelon*, feta, broad bean, zucchini, lemon, chili, strawberry, coriander leaf, pistachio, eggplant, ginger, dill, bulgur|spearmint
+coriander leaf|H|fresh aromatic|yr|lime*, chili*, avocado*, ginger, garlic, coconut, mango, tomato, cucumber, scallion, peanut, mint, black bean, corn, cumin, lemongrass, yogurt|cilantro
+parsley|H|fresh|yr|garlic*, lemon*, caper, mint, walnut, bulgur*, tomato, mushroom, egg, white bean, olive, potato, shallot|flat-leaf parsley
+dill|H|fresh|su|cucumber*, yogurt*, potato*, beetroot*, lemon, egg, mustard, fennel, caper, carrot, peas, cabbage, radish, feta, crème fraîche, broad bean|
+tarragon|H|aromatic|su|egg*, mushroom*, shallot*, mustard, asparagus, peas, tomato, lemon, peach, butter, leek, carrot, corn, apricot, beetroot|
+thyme|H|earthy aromatic|yr|mushroom*, garlic, lemon, potato, honey, rosemary, shallot, white bean, carrot, fig, apricot, goat cheese, parsnip, squash, leek, sunchoke, peach|lemon thyme
+rosemary|H|aromatic|yr|garlic*, potato*, olive oil, lemon, white bean*, honey, orange, chocolate, chestnut, squash, mushroom, parmesan, grape, polenta, pear, rhubarb, apple|
+sage|H|earthy aromatic|au wi|brown butter*, squash*, apple, white bean*, chestnut, walnut, parmesan, sweet potato, mushroom, pear, honey, sunchoke, polenta, parsnip, blackberry|
+chive|H|fresh heat|sp su|egg*, potato*, crème fraîche*, butter, radish, corn, morel, peas, lettuce, cheddar, lemon, chanterelle, scallion|chives
+shiso|H|fresh aromatic|su|cucumber*, plum*, ginger, sesame, soy sauce, rice vinegar, tofu, peach, watermelon, tomato|perilla
+oregano|H|earthy aromatic|su|tomato*, feta*, lemon, olive, garlic, eggplant, zucchini, bell pepper, white bean, chickpea, chili|marjoram
+curry leaf|H|aromatic|yr|coconut*, mustard seed*, cauliflower, potato, lentil*, tomato, chili, turmeric, cumin, lime|curry leaves
+chervil|H|fresh aromatic|sp|egg, asparagus, carrot, peas, butter, tarragon, chive, lemon|
+lemon|F|sour|yr|garlic*, parsley*, olive oil*, butter, thyme, rosemary, basil, mint, ricotta*, honey, blueberry*, almond, asparagus, broccoli, artichoke, kale, dill, zucchini, ginger, vanilla, raspberry|preserved lemon, meyer lemon
+lime|F|sour|yr|chili*, coriander leaf*, coconut*, avocado*, mango*, ginger, corn, lemongrass, watermelon, mint, sweet potato, peanut, black bean, pineapple, melon|makrut lime
+orange|F|sweet sour|wi|fennel*, beetroot*, carrot*, chocolate*, olive, cardamom, cinnamon, almond, rosemary, ginger, radicchio, rhubarb, cranberry*, date, saffron, star anise, pistachio, honey, red onion, vanilla, mint, coffee|blood orange, mandarin, clementine
+grapefruit|F|bitter sour|wi|avocado*, fennel, mint, honey, radicchio, ginger, tarragon, rosemary, pistachio|pomelo
+apple|F|sweet sour crunch|au|cinnamon*, cheddar*, celery*, walnut, celeriac*, sage, maple, brown butter, ginger, cabbage, fennel, blackberry*, pear, cardamom, beetroot, parsnip, brussels sprouts, honey, oat, almond, blue cheese, thyme, horseradish, cider vinegar|apples
+pear|F|sweet|au wi|blue cheese*, walnut*, ginger, chocolate*, vanilla, cardamom, rosemary, almond, honey, parsnip, celeriac, radicchio, thyme, sage, star anise, hazelnut, cinnamon, maple, fennel|pears
+plum|F|sweet sour|su au|star anise*, almond*, cinnamon, ginger, shiso, vanilla, cardamom, thyme, blackberry, miso, hazelnut|plums, umeboshi
+peach|F|sweet|su|basil, tomato, vanilla*, almond*, raspberry*, ricotta, mozzarella, thyme, ginger, honey, tarragon, chili, corn, shiso, chanterelle|nectarine, peaches
+apricot|F|sweet sour|su|almond*, pistachio*, vanilla, cardamom, thyme, honey, chanterelle, goat cheese, saffron, rosemary, ginger, tarragon, yogurt|apricots
+cherry|F|sweet sour|su|chocolate*, almond*, vanilla, black pepper, balsamic, goat cheese, pistachio, thyme, mint|cherries, sour cherry
+strawberry|F|sweet sour|sp su|rhubarb*, balsamic*, black pepper, basil, mint, vanilla, cucumber, tomato, chocolate, crème fraîche*, pistachio, radish, lime|strawberries
+raspberry|F|sweet sour|su|chocolate*, peach*, almond, vanilla, lemon, mint, beetroot, pistachio, yogurt, hazelnut|raspberries
+blueberry|F|sweet|su|lemon*, corn, maple, vanilla, cinnamon, almond, yogurt, oat, goat cheese|blueberries
+blackberry|F|sweet sour|su au|apple*, beetroot, vanilla, sage, hazelnut, almond, plum, cardamom, thyme|blackberries
+fig|F|sweet|su au|goat cheese*, honey*, walnut, thyme, balsamic, blue cheese, orange, rosemary, almond, pistachio, sesame, chocolate, star anise|figs
+grape|F|sweet|au|rosemary, walnut, blue cheese, ricotta, almond, fennel|grapes, concord
+pomegranate|F|sour sweet crunch|au wi|mint*, walnut*, eggplant, feta, pistachio, cauliflower, orange, yogurt, coriander leaf, radicchio, brussels sprouts, carrot, sumac, chickpea|pomegranate molasses
+mango|F|sweet|yr|lime*, chili*, coconut*, coriander leaf, ginger, cardamom*, mint, yogurt, avocado, black pepper, lemongrass, sesame, red onion|
+pineapple|F|sweet sour|yr|chili*, lime, coconut*, mint, ginger, coriander leaf, black pepper, star anise, vanilla, soy sauce|
+watermelon|F|sweet fresh|su|feta*, mint*, lime*, chili, cucumber, basil, tomato, black pepper, red onion, shiso|
+melon|F|sweet fresh|su|mint, cucumber, lime, ginger, black pepper*, basil, feta, chili|cantaloupe, honeydew
+coconut|F|sweet rich|yr|lime*, lemongrass*, chili*, ginger*, mango*, coriander leaf, curry leaf*, turmeric, pineapple, sweet potato, peas, chocolate, cardamom, banana, peanut, tofu, lentil, squash, corn, basil, cauliflower, rice*|coconut milk
+banana|F|sweet rich|yr|chocolate*, peanut*, cinnamon, coconut, maple, vanilla, cardamom, miso, oat, walnut, lime, coffee|
+date|F|sweet|yr|tahini*, orange, walnut, almond, cardamom, coffee, chili, goat cheese, cinnamon, parmesan|medjool, dates
+cranberry|F|sour|au|orange*, maple, ginger, pecan, sage, apple, cinnamon|cranberries
+rhubarb|F|sour|sp|strawberry*, ginger*, orange, vanilla*, cardamom, pistachio, honey, almond, yogurt, rosemary, beetroot|
+raisin|F|sweet|yr|caper*, pine nut*, cauliflower*, kale, spinach, carrot, celery, cinnamon|raisins, currants, sultanas
+cumin|S|earthy aromatic|yr|coriander seed*, carrot*, chickpea*, lentil*, cauliflower, lime, yogurt, tomato, black bean*, eggplant, sweet potato, garlic, chili, smoked paprika, spinach, potato, peas, broad bean, coriander leaf, parsnip, beetroot, jackfruit|
+coriander seed|S|aromatic|yr|cumin*, carrot, orange, lentil, mushroom, ginger, cauliflower, chickpea|
+smoked paprika|S|smoky sweet|yr|potato*, chickpea*, garlic, tomato, white bean, egg, bell pepper*, almond, sweet potato, corn, tofu, mushroom, kale, eggplant, tempeh*, jackfruit*, seitan|pimentón
+turmeric|S|earthy bitter|yr|cauliflower*, ginger*, coconut, lentil*, black pepper, potato, cumin, curry leaf, tofu*, egg, chickpea|
+cardamom|S|aromatic floral|yr|orange, pistachio*, coffee*, chocolate, mango, carrot, pear, apple, apricot, rhubarb, plum, blackberry, banana, coconut, date, vanilla, saffron|
+cinnamon|S|sweet aromatic|yr|apple*, chocolate, orange, plum, pear, banana, coffee, sweet potato, squash, tomato, cranberry, blueberry, date, oat|
+star anise|S|aromatic|yr|plum*, orange, pear, pineapple, carrot, soy sauce, tofu, chocolate, seitan|
+nutmeg|S|aromatic|yr|spinach*, squash, parsnip, potato, ricotta, egg|mace
+saffron|S|floral bitter|yr|cauliflower, potato, fennel*, orange, tomato, almond, cardamom, apricot, white bean, rice*, honey, chickpea|
+black pepper|S|heat|yr|strawberry, cherry, parmesan*, pecorino*, pineapple, mango, watermelon, melon, turmeric, egg, tofu*|cracked pepper, peppercorn
+mustard seed|S|heat|yr|curry leaf*, coconut, potato, cauliflower, lentil, cabbage, turmeric|
+sumac|S|sour|yr|red onion*, tomato, cucumber, yogurt, chickpea, pomegranate, eggplant, feta|
+caraway|S|aromatic earthy|yr|cabbage*, beetroot, potato, carrot, apple, cheddar|
+juniper|S|aromatic bitter|au wi|cabbage*, apple, beetroot, mushroom, orange|
+vanilla|S|sweet floral|yr|strawberry, peach*, apricot, rhubarb*, pear, raspberry, blueberry, cherry, plum, banana, chocolate, coconut, carrot, parsnip, lemon, orange|
+garam masala|S|aromatic heat|yr|spinach, paneer*, chickpea*, lentil, potato, cauliflower, tomato, peas, sweet potato|
+mustard|K|heat sour|yr|leek, celeriac*, potato, cabbage, dill, tarragon, honey*, apple, cheddar*, egg, brussels sprouts, cauliflower, tempeh|dijon, wholegrain mustard
+harissa|K|heat smoky|yr|carrot*, chickpea, eggplant, honey, yogurt, sweet potato, egg*|
+gochujang|K|heat umami sweet|yr|cabbage, tofu*, sesame*, egg, honey, mushroom, scallion, kimchi, sweet potato, seitan|
+chocolate|K|bitter sweet rich|yr|orange*, raspberry*, cherry*, chili, mint*, hazelnut*, coffee*, banana, pear, peanut, cardamom, beetroot, rosemary, olive oil*, miso, tahini, fig, date, chestnut|cocoa, cacao, dark chocolate
+coffee|K|bitter|yr|chocolate*, cardamom*, cinnamon, vanilla, hazelnut, date, maple, banana, orange|espresso
+honey|K|sweet floral|yr|goat cheese*, fig*, thyme, lemon, ginger, carrot, mustard, ricotta*, radicchio, walnut, apricot, pear, chili, sage, harissa, yogurt, rosemary, peach, parsnip|
+maple|K|sweet|wi sp|parsnip*, squash, sweet potato, pecan*, miso, apple, blueberry, banana, brussels sprouts, oat*, carrot, cranberry, walnut, coffee, tempeh*, mustard|maple syrup
+miso|K|umami salty|yr|eggplant*, butter*, mushroom, sweet potato*, corn*, maple, sesame, ginger, tofu, squash, carrot, chocolate, banana, cabbage, asparagus, parsnip, scallion, radish, broccoli, brussels sprouts|white miso, red miso
+soy sauce|K|umami salty|yr|ginger*, garlic*, sesame*, scallion, mushroom*, shiitake*, tofu*, chili, maple, butter, honey, mirin*, bok choy, tempeh*, seitan*|tamari, shoyu
+mirin|K|sweet umami|yr|soy sauce*, ginger, shiitake, eggplant, sesame|
+balsamic|K|sweet sour|yr|strawberry*, tomato, fig, cherry, radicchio*, beetroot, mozzarella, brussels sprouts, red onion, parmesan|balsamic vinegar
+rice vinegar|K|sour|yr|cucumber*, sesame, ginger, soy sauce, shiso, carrot, radish|
+cider vinegar|K|sour|yr|cabbage*, apple, mustard, maple, beetroot, honey, jackfruit|apple cider vinegar
+sherry vinegar|K|sour|yr|mushroom*, tomato, almond, shallot*, smoked paprika, sunchoke|
+olive oil|K|rich|yr|garlic*, lemon*, tomato*, basil, rosemary, chili, white bean*, chocolate, orange, artichoke*, broad bean|evoo
+olive|K|salty bitter|yr|orange*, fennel*, tomato, feta, oregano, rosemary, lemon, caper*, bell pepper, artichoke, almond|olives, kalamata, castelvetrano
+caper|K|salty sour|yr|lemon*, parsley, cauliflower, potato, tomato, olive*, dill, egg, celeriac, raisin, brown butter, broccoli|capers
+kimchi|K|sour heat umami|yr|egg*, tofu*, scallion, sesame, gochujang, cheddar, potato, mushroom, rice*|
+butter|D|rich|yr|lemon, radish*, honey, miso*|cultured butter
+brown butter|D|rich|yr|squash*, sage*, sunchoke*, parsnip, cauliflower, hazelnut*, apple, lemon, caper, brussels sprouts, sweet potato, celeriac, corn, miso|beurre noisette
+crème fraîche|D|rich sour|yr|potato, chive, dill, leek, morel, strawberry, chanterelle, horseradish|sour cream, creme fraiche
+yogurt|D|sour rich|yr|cucumber*, mint*, garlic, dill, eggplant, carrot, cumin, honey, pomegranate, sumac, harissa, chickpea, beetroot, raspberry, apricot, blueberry, mango, spinach, tahini|greek yogurt, labneh
+ricotta|D|rich|yr|lemon*, honey*, peas, spinach*, basil, zucchini, broad bean, peach, ramp, squash, nutmeg, grape|
+feta|D|salty sour|yr|watermelon*, tomato, oregano*, cucumber, olive, mint, spinach, zucchini, beetroot, pomegranate, broad bean, chili, sweet potato, corn, bell pepper, honey, radish|
+goat cheese|D|sour rich|yr|beetroot*, honey*, fig*, thyme, walnut, apricot, cherry, squash, date|chèvre, chevre
+parmesan|D|umami salty|yr|asparagus*, black pepper*, mushroom, peas, squash, broccoli, kale, cauliflower, zucchini, egg, potato, artichoke, brussels sprouts, sage, rosemary, pear, corn, polenta*, radicchio, balsamic, date|parmigiano, grana padano
+pecorino|D|salty|yr|broad bean*, black pepper*, peas, honey, pear|pecorino romano
+mozzarella|D|rich|su|tomato*, basil*, peach, balsamic, olive oil|burrata, fior di latte
+blue cheese|D|salty rich|yr|pear*, walnut*, celery*, honey, fig, radicchio, apple, celeriac, lettuce, grape|gorgonzola, stilton, roquefort
+cheddar|D|salty rich|yr|apple*, cauliflower*, mustard*, potato, leek, kimchi, celery, broccoli, chive, red onion, caraway|aged cheddar
+gruyère|D|rich umami|yr|leek*, mushroom, potato, egg|comté, gruyere
+paneer|D|rich|yr|spinach*, peas*, garam masala*, tomato, chili, cumin|
+egg|D|rich|yr|asparagus*, chive*, tarragon*, spinach, mushroom, potato, kimchi*, harissa*, tomato, morel, chanterelle, parmesan, dill, caper, leek, smoked paprika, turmeric, black pepper, ramp, scallion, gochujang, gruyère, chervil, nutmeg|eggs, yolk
+tofu|P|umami|yr|ginger*, soy sauce*, scallion*, sesame, gochujang*, chili, miso, shiitake, mushroom, turmeric*, kimchi*, black pepper*, lemongrass, coconut, smoked paprika, peanut, bok choy, star anise|bean curd, silken tofu, firm tofu
+tempeh|P|umami earthy|yr|soy sauce*, maple*, smoked paprika*, garlic, chili, peanut*, lime, ginger, coconut, cabbage, mustard, sweet potato|
+seitan|P|umami|yr|soy sauce*, garlic*, smoked paprika, black pepper, mushroom*, sage, thyme, gochujang, maple, star anise, ginger|wheat meat, wheat gluten
+jackfruit|P|sweet|yr|smoked paprika*, cumin*, chili*, lime, coriander leaf, cabbage, garlic, maple, coconut, black bean, cider vinegar|young jackfruit, pulled jackfruit
+lentil|G|earthy|yr|cumin*, coriander seed, turmeric*, curry leaf*, coconut, tomato, lemon, spinach, mustard seed, garam masala, carrot, mushroom, parsley, thyme|lentils, dal, puy lentil
+chickpea|G|earthy rich|yr|tahini*, cumin*, lemon*, garlic, smoked paprika*, spinach, tomato, harissa, garam masala*, sumac, saffron, coriander leaf, yogurt, bell pepper|garbanzo, chickpeas, hummus
+black bean|G|earthy|yr|cumin*, lime*, chili*, coriander leaf*, avocado, corn*, sweet potato, smoked paprika, garlic, orange|black beans
+white bean|G|rich earthy|yr|rosemary*, garlic*, sage*, olive oil*, lemon, kale*, tomato, leek, fennel, parsley, thyme, smoked paprika, artichoke, ramp, saffron, oregano, mushroom|cannellini, butter bean, navy bean
+polenta|G|sweet rich|yr|parmesan*, mushroom*, butter*, rosemary, sage, tomato, corn|grits, cornmeal
+bulgur|G|earthy|yr|parsley*, mint*, tomato, lemon, pomegranate, cucumber|tabbouleh, freekeh
+oat|G|earthy|yr|maple*, apple, banana, blueberry, cinnamon, cardamom, date|oats, oatmeal
+rice|G|rich|yr|saffron*, coconut*, soy sauce, egg, kimchi*, peas, lime|risotto
+walnut|N|bitter rich crunch|au|beetroot, blue cheese*, pear*, apple, celery*, pomegranate*, honey, fig, goat cheese, parsley, maple, banana, coffee, date, kale, radicchio, sage, grape, ramp, bell pepper*|walnuts
+almond|N|sweet crunch|yr|apricot*, cherry*, peach*, plum*, orange, raspberry, blueberry, green beans*, smoked paprika, saffron, cauliflower, broccoli, zucchini, grape, olive, sherry vinegar, honey, fig, chocolate|almonds, marcona
+hazelnut|N|crunch earthy|au|chocolate*, coffee, pear, sunchoke*, celeriac, mushroom, squash, beetroot, raspberry, brown butter*, asparagus, leek, chanterelle, blackberry, plum, radicchio|filbert, hazelnuts
+pistachio|N|sweet crunch|yr|cardamom*, apricot*, orange, strawberry, raspberry, fennel, pomegranate, cherry, rhubarb, grapefruit, mint, fig, carrot, honey|pistachios
+pine nut|N|rich crunch|yr|basil*, spinach, raisin*, kale, zucchini, lemon, parmesan|pine nuts, pignoli
+pecan|N|sweet crunch|au|maple*, sweet potato, squash, cranberry, brussels sprouts, banana, chocolate|pecans
+peanut|N|rich crunch|yr|lime, chili*, banana*, chocolate, coconut*, ginger, coriander leaf, tofu, tempeh*, celery, scallion, sweet potato, broccoli, mango|peanuts, peanut butter
+pumpkin seed|N|crunch earthy|au|squash*, chili, lime, coriander leaf|pepitas
+sesame|N|crunch rich|yr|soy sauce*, ginger, scallion*, cucumber, spinach, tofu, honey, gochujang*, kale, eggplant, miso, broccoli, carrot, bok choy, avocado, fig|sesame oil, sesame seed
+tahini|N|bitter rich|yr|chickpea*, lemon*, garlic, date*, eggplant*, cauliflower, carrot, kale, sweet potato, broccoli, chocolate, banana, honey, yogurt|
+chestnut|N|sweet earthy|au wi|brussels sprouts*, mushroom*, sage, squash, chocolate, rosemary, orange, vanilla, apple|chestnuts
+fiddlehead|V|fresh bitter|sp|butter*, lemon*, garlic, ramp*, morel, egg, parmesan, shallot|fiddleheads, ostrich fern
+kohlrabi|V|fresh crunch sweet|su au|apple*, dill, mustard, lemon, sesame, butter, chili|
+turnip|V|bitter earthy|au wi|butter*, miso*, honey, mustard, thyme, apple, pear, chive|turnips, rutabaga
+okra|V|fresh|su|tomato*, chili*, cumin, garlic, corn, lime, mustard seed, turmeric|bhindi
+plantain|F|sweet rich|yr|lime*, chili*, black bean*, coconut, cinnamon, avocado, coriander leaf, smoked paprika|plantains, maduros
+persimmon|F|sweet|au|pomegranate, ginger, walnut, mozzarella, radicchio*, cinnamon, vanilla, lime, black pepper|kaki, hachiya, fuyu
+quince|F|sour floral|au|vanilla*, cinnamon, apple, pear, cheddar*, almond, star anise, rosemary, honey|membrillo
+yuzu|F|sour floral|wi|soy sauce*, ginger, honey, sesame, chili, miso, strawberry, black pepper|yuzu kosho
+sea buckthorn|F|sour|au|honey*, orange, apple, carrot, ginger, yogurt|seaberry
+haskap|F|sour sweet|su|vanilla, lemon, yogurt*, mint, maple, goat cheese|honeyberry
+saskatoon berry|F|sweet|su|almond*, rhubarb, apple, cinnamon, lemon, maple|saskatoon, serviceberry, juneberry
+ground cherry|F|sweet sour|su au|tomato, chili, corn, honey, mint, vanilla*|physalis, cape gooseberry
+sorrel|H|sour fresh|sp su|egg*, potato*, crème fraîche, butter, beetroot, strawberry, lentil, peas|
+lovage|H|fresh aromatic|su|potato*, tomato, peas, carrot, egg, lentil|
+lavender|H|floral|su|honey*, lemon, blueberry, apricot, strawberry, vanilla, peach, goat cheese|
+elderflower|H|floral sweet|sp su|strawberry*, lemon, rhubarb*, cucumber, pear, peach|elderberry
+fenugreek|S|bitter aromatic|yr|potato*, spinach, tomato, paneer, lentil, carrot|methi
+sichuan pepper|S|heat aromatic|yr|tofu*, eggplant, chili*, scallion, garlic, cucumber, chocolate, ginger|mala, szechuan pepper
+za'atar|S|aromatic sour|yr|olive oil*, yogurt*, tomato, cucumber, feta, egg, chickpea, lemon|zaatar, zatar
+tamarind|K|sour sweet|yr|chili*, lime, coriander leaf, peanut, date*, ginger, cumin, mango, tofu, eggplant|
+black garlic|K|sweet umami|yr|butter*, mushroom, miso, honey, chocolate, egg, parmesan, potato, soy sauce|
+seaweed|K|umami salty|yr|sesame*, soy sauce, rice*, cucumber, avocado*, tofu, butter, egg, potato|nori, kombu, dulse, laver
+buckwheat|G|earthy|yr|mushroom*, egg, butter, apple, honey, beetroot, maple|kasha, soba
+farro|G|earthy|yr|mushroom, squash, kale, parmesan*, tomato, lemon, walnut|spelt
+edamame|G|fresh|su|sesame*, chili, garlic, lime, mint, peas, soy sauce|soybean
+sunflower seed|N|crunch|yr|beetroot, kale, carrot, honey, lemon|sunflower seeds
+cashew|N|rich sweet|yr|coconut*, chili, cardamom, lime, garam masala, tofu, mango, broccoli|cashews
+halloumi|D|salty rich|yr|watermelon*, mint, lemon*, chili, honey, tomato, zucchini, za'atar|
+lion's mane|M|umami|yr|butter*, thyme, garlic, lemon, soy sauce, black pepper, caper|lions mane
+`;
+
+const NOTES_RAW = [
+ ['beetroot','orange','Roast beets in their skins, peel warm and dress with orange segments and the reduced juice.'],
+ ['beetroot','goat cheese','Whip the cheese with a splash of cream and lemon; spoon it under salt-baked beets.'],
+ ['beetroot','horseradish','Grate fresh horseradish into crème fraîche and fold through raw shaved beets.'],
+ ['squash','sage','Fry the sage in brown butter until the bubbling stops; the leaves go glassy, the butter nutty.'],
+ ['miso','eggplant','Score, roast cut-side down, then glaze with miso, mirin and a little sugar under the broiler.'],
+ ['tomato','strawberry','Equal weights, salted and left ten minutes; the juices become the dressing.'],
+ ['watermelon','feta','Press the melon briefly with salt and lime to firm it before plating with feta.'],
+ ['corn','miso','Mash white miso into soft butter and brush it over charred cobs.'],
+ ['cauliflower','raisin','Plump raisins in warm vinegar, then scatter over deeply roasted florets with capers.'],
+ ['chocolate','olive oil','Swap half the butter in a chocolate cake for a peppery olive oil.'],
+ ['peas','mint','Blanch for seconds and shock; blitz half with mint and butter for a bright purée.'],
+ ['carrot','cumin','Toast whole cumin and crack it over carrots roasted until the edges catch.'],
+ ['celeriac','apple','Cut both into fine matchsticks and dress with mustard and crème fraîche.'],
+ ['parsnip','maple','Roast, then glaze with maple and a pinch of chili for the last five minutes.'],
+ ['tofu','black pepper','Fry cubes crisp, then toss in butter, shallot, soy and plenty of cracked pepper.'],
+ ['tempeh','maple','Steam first to take out bitterness, then glaze with maple, soy and smoked paprika.'],
+ ['jackfruit','smoked paprika','Simmer young jackfruit until it shreds, then fry hard with smoked paprika and cumin.'],
+ ['mushroom','thyme','Sear in a dry, hot pan first; add butter, garlic and thyme only at the end.'],
+ ['fig','goat cheese','Split figs, fill with goat cheese, drizzle with honey and blister under the broiler.'],
+ ['strawberry','balsamic','Macerate with aged balsamic and black pepper for twenty minutes.'],
+ ['radish','butter','Cold radishes, soft salted butter, flaky salt.'],
+ ['pear','blue cheese','Poach pears just until tender so they hold shape; fill the core with blue cheese and walnut.'],
+ ['fennel','orange','Shave fennel paper-thin into iced water, then toss with orange, olives and good oil.'],
+ ['chickpea','tahini','Whip tahini with ice water before adding chickpeas for the silkiest hummus.'],
+ ['avocado','grapefruit','Segment the grapefruit over the bowl and use the caught juice in the dressing.'],
+ ['rhubarb','ginger','Roast rhubarb batons in ginger syrup so they hold their shape.'],
+ ['kimchi','egg','Fry kimchi in butter until it caramelises, then crack eggs into the same pan.'],
+ ['apple','cheddar','Grate aged cheddar into the pastry for an apple tart or galette.'],
+ ['peach','mozzarella','Grill peaches cut-side down; serve warm with burrata and torn basil.'],
+ ['sunchoke','hazelnut','Roast sunchokes until collapsing, finish with brown butter and toasted hazelnuts.'],
+ ['brussels sprouts','chestnut','Shred sprouts, sauté hard and fold through crumbled roasted chestnuts.'],
+ ['mushroom','sherry vinegar','Deglaze seared mushrooms with sherry vinegar for a sharp, nutty finish.'],
+ ['coconut','lemongrass','Bruise lemongrass and steep it in coconut milk before building a curry or panna cotta.'],
+ ['black bean','corn','Char corn kernels in a dry pan and fold through black beans with lime and chili.'],
+ ['potato','dill','Crush new potatoes with butter, dill and a little mustard.'],
+ ['fiddlehead','butter','Boil hard for a few minutes and refresh before sautéing in butter; never serve them raw.'],
+ ['halloumi','watermelon','Sear the halloumi until golden and lay it on cold melon so it hits the plate warm.'],
+ ['black garlic','butter','Mash cloves into soft butter for a sweet, savoury finish on mushrooms or toast.'],
+ ['lion\'s mane','butter','Press the mushroom under a weight in a hot pan, then baste in butter and thyme.'],
+ ['quince','cheddar','Slow-cook quince to a firm paste and slice it with aged cheddar.'],
+ ['sea buckthorn','honey','Blend the berries with honey and strain for a sharp, bright glaze or curd base.'],
+];
+
+/* ---------- BUILD GRAPH ---------- */
+let ING = {}, EDGES = {}, NOTES = {}, MY_NOTES = {}, KEYS = [], missing = [];
+const MINE = new Set(), MINE_PAIRS = new Set();
+let CUSTOM = {ingredients: [], pairs: [], notes: {}};
+const pk = (a,b) => [a,b].sort().join('+');
+function link(a,b,s){ EDGES[a][b] = Math.max(EDGES[a][b]||0, s); EDGES[b][a] = Math.max(EDGES[b][a]||0, s); }
+function buildGraph(){
+  ING = {}; EDGES = {}; NOTES = {}; MY_NOTES = {}; missing = []; MINE.clear(); MINE_PAIRS.clear();
+  const pend = [];
+  RAW.trim().split('\n').forEach(line => {
+    const [name, cat, tags, season, pairs, alias] = line.split('|').map(s => (s||'').trim());
+    ING[name] = {name, cat, tags: tags.split(/\s+/), season: season.split(/\s+/), alias: alias ? alias.split(',').map(a=>a.trim().toLowerCase()) : []};
+    EDGES[name] = {}; pend.push([name, pairs]);
+  });
+  (CUSTOM.ingredients || []).forEach(c => {
+    if(!c || !c.name) return;
+    const n = c.name;
+    if(!ING[n]){ ING[n] = {name:n, cat: CATS[c.cat] ? c.cat : 'V', tags: (c.tags && c.tags.length) ? c.tags : ['earthy'], season: (c.season && c.season.length) ? c.season : ['yr'], alias: []}; EDGES[n] = {}; }
+    MINE.add(n);
+  });
+  pend.forEach(([name, pairs]) => pairs.split(',').forEach(p => {
+    p = p.trim(); if(!p) return; let s = 2;
+    if(p.endsWith('*')){ s = 3; p = p.slice(0,-1).trim(); }
+    if(!ING[p]){ missing.push(name+' → '+p); return; }
+    if(p !== name) link(name, p, s);
+  }));
+  (CUSTOM.pairs || []).forEach(([a,b,s]) => {
+    if(!ING[a] || !ING[b] || a === b) return;
+    EDGES[a][b] = s; EDGES[b][a] = s; MINE_PAIRS.add(pk(a,b));
+  });
+  NOTES_RAW.forEach(([a,b,t]) => { NOTES[pk(a,b)] = t; });
+  Object.entries(CUSTOM.notes || {}).forEach(([k,t]) => { if(t) MY_NOTES[k] = t; });
+  KEYS = Object.keys(ING).sort((a,b)=>a.localeCompare(b));
+  window.__missing = missing;
+}
+const str = (a,b) => (EDGES[a] && EDGES[a][b]) || 0;
+const deg = k => Object.keys(EDGES[k] || {}).length;
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+const note = (a,b) => MY_NOTES[pk(a,b)] || NOTES[pk(a,b)];
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const BAL = [['sweet','Sweet'],['sour','Acid'],['salty','Salt'],['umami','Umami'],['bitter','Bitter'],['rich','Fat'],['heat','Heat'],['fresh','Fresh'],['crunch','Crunch']];
+const SEASON_NAMES = {sp:'Spring', su:'Summer', au:'Autumn', wi:'Winter', yr:'Year-round'};
+function seasonNow(){ const m = new Date().getMonth(); return (m < 2 || m === 11) ? 'wi' : m < 5 ? 'sp' : m < 8 ? 'su' : 'au'; }
+const NOW = seasonNow();
+const inSeason = k => !!ING[k] && (ING[k].season.includes('yr') || ING[k].season.includes(NOW));
+const isProduce = k => !!ING[k] && !ING[k].season.includes('yr');
+
+const TECHNIQUES = ['Roast it hard','Char over open flame','Shave it raw','Quick-pickle one element','Ferment one element for a week','Purée it silky','Baste in brown butter','Salt-bake','Confit in oil','Dehydrate one element to a crisp','Smoke it lightly','Cure in salt and sugar','Glaze and lacquer','Juice it and reduce to a glaze','Cook it in its skin','Steam and dress warm','Fry into fritters','Whip into a mousse','Grill and serve at room temperature','Turn one element into a powder'];
+const FORMATS = ['small plate','salad','soup','tart','dumpling','skewer','toast','dip','pasta','rice bowl','dessert','condiment','brunch dish','bar snack','sandwich','cold starter'];
+
+/* ---------- NATIVE BRIDGE (Capacitor; inert on the web) ---------- */
+const Native = {
+  _p: {},
+  get on(){ try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch(e){ return false; } },
+  plugin(n){
+    if(!this.on) return null;
+    if(this._p[n]) return this._p[n];
+    const C = window.Capacitor;
+    this._p[n] = (C.Plugins && C.Plugins[n]) || (C.registerPlugin ? C.registerPlugin(n) : null);
+    return this._p[n];
+  },
+  tap(){ const h = this.plugin('Haptics'); if(h) h.impact({style:'LIGHT'}).catch(()=>{}); },
+  thud(){ const h = this.plugin('Haptics'); if(h) h.impact({style:'MEDIUM'}).catch(()=>{}); }
+};
+const shareWord = () => Native.on ? 'Share' : 'Copy';
+
+/* ---------- STATE ---------- */
+const STORE_KEYS = ['sel','ticket','saved','opts','custom','daily'];
+const store = {
+  cache: {},
+  get(k, d){ return (k in this.cache) ? this.cache[k] : d; },
+  set(k, v){
+    this.cache[k] = v; const s = JSON.stringify(v);
+    try { localStorage.setItem('flavour-atlas:'+k, s); } catch(e){}
+    const P = Native.plugin('Preferences'); if(P) P.set({key:'fa:'+k, value:s}).catch(()=>{});
+  },
+  async load(){
+    const P = Native.plugin('Preferences');
+    for(const k of STORE_KEYS){
+      let v = null;
+      if(P){ try { const r = await P.get({key:'fa:'+k}); v = r && r.value; } catch(e){} }
+      if(v == null){ try { v = localStorage.getItem('flavour-atlas:'+k); } catch(e){} }
+      if(v != null){ try { this.cache[k] = JSON.parse(v); } catch(e){} }
+    }
+  }
+};
+const S = {view:'explore', cat:'all', q:'', seasonal:false, sel:'tomato', ticket:[], saved:[], opts:{size:4, mode:'balanced', hero:'', season:'any'}, spark:null, history:[], daily:{on:false, hour:9}};
+function initState(){
+  CUSTOM = Object.assign({ingredients:[], pairs:[], notes:{}}, store.get('custom', {}));
+  buildGraph();
+  S.sel = store.get('sel', NOW === 'au' ? 'squash' : NOW === 'wi' ? 'parsnip' : NOW === 'sp' ? 'asparagus' : 'tomato');
+  if(!ING[S.sel]) S.sel = 'tomato';
+  S.ticket = store.get('ticket', ['beetroot','orange','goat cheese']).filter(k => ING[k]);
+  S.saved = store.get('saved', []);
+  S.opts = Object.assign({size:4, mode:'balanced', hero:'', season:'any'}, store.get('opts', {}));
+  S.daily = Object.assign({on:false, hour:9}, store.get('daily', {}));
+}
+const mobile = () => window.matchMedia('(max-width:900px)').matches;
+let mobileShowDetail = false;
+
+/* ---------- HELPERS ---------- */
+const $ = s => document.querySelector(s);
+function dot(k){ return `<span class="dot" style="--c:${ING[k] ? CATS[ING[k].cat].c : '#999'}"></span>`; }
+function pillFor(s){ return s===3 ? '<span class="pill classic">Classic</span>' : s===2 ? '<span class="pill good">Good</span>' : '<span class="pill none">Uncharted</span>'; }
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.remove('on'), 1800); }
+function weightedPick(arr, wf){ const tot = arr.reduce((s,x)=>s+wf(x),0); let r = Math.random()*tot; for(const x of arr){ r -= wf(x); if(r <= 0) return x; } return arr[arr.length-1]; }
+function rand(a){ return a[Math.floor(Math.random()*a.length)]; }
+function comboText(items, extra){ return items.map(cap).join(' + ') + (extra ? '\n' + extra : ''); }
+async function copy(text){
+  const Sh = Native.plugin('Share');
+  if(Sh){ try { await Sh.share({title:'Flavour Atlas', text}); } catch(e){} return; }
+  try { await navigator.clipboard.writeText(text); toast('Copied'); } catch(e){ toast('Copy is blocked here; select the text instead'); }
+}
+
+function balanceOf(items){
+  const have = new Set(); items.forEach(k => ING[k].tags.forEach(t => have.add(t)));
+  return BAL.map(([t,l]) => ({t, l, on: have.has(t)}));
+}
+function sharedPartners(items){
+  if(!items.length) return [];
+  return KEYS.filter(k => !items.includes(k)).map(k => {
+    const links = items.filter(i => str(i,k) > 0);
+    return {k, n: links.length, score: links.reduce((s,i)=>s+str(i,k),0)};
+  }).filter(o => o.n > 0).sort((a,b) => b.n - a.n || b.score - a.score || a.k.localeCompare(b.k));
+}
+function harmony(items){
+  const pairs = [];
+  for(let i=0;i<items.length;i++) for(let j=i+1;j<items.length;j++) pairs.push([items[i], items[j], str(items[i], items[j])]);
+  if(!pairs.length) return {pairs, score:null};
+  const score = Math.round(pairs.reduce((s,p)=>s + (p[2]===3?100:p[2]===2?70:15),0) / pairs.length);
+  return {pairs, score};
+}
+function fixesFor(items){
+  return balanceOf(items).filter(b => !b.on).map(b => {
+    const c = KEYS.filter(k => !items.includes(k) && ING[k].tags.includes(b.t))
+      .map(k => ({k, n: items.filter(i=>str(i,k)>0).length, score: items.reduce((s,i)=>s+str(i,k),0)}))
+      .filter(o => o.n > 0).sort((a,b)=>b.n-a.n || b.score-a.score).slice(0,4);
+    return {b, c};
+  });
+}
+
+/* ---------- SPARK ENGINE ---------- */
+function makeSpark(o){
+  const {size, mode, hero, season} = o || S.opts;
+  const pool = KEYS.filter(k => season === 'any' || inSeason(k));
+  const minS = mode === 'classic' ? 3 : 2;
+  const classicDeg = k => pool.filter(n => str(k,n) === 3).length;
+  let heroes = pool.filter(k => deg(k) >= 6 && (mode !== 'classic' || classicDeg(k) >= size + 1));
+  if(season !== 'any'){ const prod = heroes.filter(isProduce); if(prod.length) heroes = Math.random() < 0.75 ? prod : heroes; }
+  if(!heroes.length) heroes = pool.filter(k => deg(k) >= 3);
+  let start = hero && ING[hero] ? hero : weightedPick(heroes, k => Math.sqrt(deg(k)));
+  const combo = [start], via = {};
+  for(let step = 1; step < size; step++){
+    const lastWild = mode === 'wild' && step === size - 1;
+    const build = min => pool.filter(k => !combo.includes(k)).map(k => {
+      const links = combo.filter(c => str(c,k) >= min);
+      return {k, links, score: links.reduce((s,c)=>s+str(c,k),0)};
+    }).filter(o => o.links.length && o.links.includes(start));
+    let cands = build(minS);
+    if(!cands.length && minS === 3) cands = build(2);
+    if(lastWild){ cands = pool.filter(k => !combo.includes(k)).map(k => { const links = combo.filter(c => str(c,k) >= 2); return {k, links, score: links.reduce((s,c)=>s+str(c,k),0)}; }).filter(o => o.links.length); }
+    if(!cands.length) break;
+    if(lastWild){
+      const bridge = cands.filter(o => o.links.length === 1 && o.links[0] !== start);
+      if(bridge.length) cands = bridge;
+    } else {
+      const max = Math.max(...cands.map(o=>o.links.length));
+      const need = mode === 'classic' ? max : Math.max(1, max - (mode === 'wild' ? 1 : 0));
+      let strict = cands.filter(o => o.links.length >= need && o.links.includes(start));
+      if(!strict.length) strict = cands.filter(o => o.links.includes(start));
+      if(!strict.length) break;
+      cands = strict;
+    }
+    const cats = combo.map(c => ING[c].cat);
+    const pick = weightedPick(cands, o => {
+      let w = o.score * o.score;
+      if(cats.includes(ING[o.k].cat)) w *= 0.25;
+      return w;
+    });
+    combo.push(pick.k); via[pick.k] = {links: pick.links, wild: lastWild && pick.links.length === 1 && pick.links[0] !== start};
+  }
+  return {items: combo, via, technique: rand(TECHNIQUES), format: rand(FORMATS), mode};
+}
+
+/* ---------- RENDER: EXPLORE ---------- */
+function renderCats(){
+  const counts = {}; KEYS.forEach(k => counts[ING[k].cat] = (counts[ING[k].cat]||0)+1);
+  let h = `<button class="chip" data-cat="all" aria-pressed="${S.cat==='all'}">All</button>`;
+  Object.entries(CATS).forEach(([c,v]) => { h += `<button class="chip" data-cat="${c}" aria-pressed="${S.cat===c}"><span class="dot" style="--c:${v.c}"></span>${v.n}</button>`; });
+  h += `<button class="chip season" data-season-toggle aria-pressed="${S.seasonal}">In season now · ${SEASON_NAMES[NOW]}</button>`;
+  $('#cats').innerHTML = h;
+}
+function filtered(){
+  const q = S.q.trim().toLowerCase();
+  return KEYS.filter(k => {
+    const i = ING[k];
+    if(S.cat !== 'all' && i.cat !== S.cat) return false;
+    if(S.seasonal && !inSeason(k)) return false;
+    if(q) return k.includes(q) || i.alias.some(a => a.includes(q));
+    return true;
+  });
+}
+function renderGrid(){
+  const list = filtered();
+  $('#resultCount').textContent = `${list.length} ingredient${list.length===1?'':'s'}`;
+  $('#grid').innerHTML = list.length ? list.map(k => `<button class="tile" data-open="${esc(k)}" aria-selected="${S.sel===k}">${dot(k)}<span class="tname">${esc(cap(k))}${MINE.has(k) ? ' <span class="mine">yours</span>' : ''}</span><span class="tcount">${deg(k)}</span></button>`).join('')
+    : `<div class="empty" style="grid-column:1/-1">Nothing matches “${esc(S.q)}”. Try another name, like aubergine or cilantro${S.q.trim() ? `, or <button class="btn sm" data-newing="${esc(S.q.trim())}">Add “${esc(S.q.trim())}” as your own</button>` : ''}.</div>`;
+}
+function renderDetail(){
+  const k = S.sel, i = ING[k];
+  const nb = Object.entries(EDGES[k]).sort((a,b)=> b[1]-a[1] || ING[a[0]].cat.localeCompare(ING[b[0]].cat) || a[0].localeCompare(b[0]));
+  const classic = nb.filter(e=>e[1]===3), good = nb.filter(e=>e[1]===2);
+  // second-degree: reached through classic partners, not directly linked
+  const far = {};
+  classic.forEach(([n]) => Object.entries(EDGES[n]).forEach(([m,s]) => { if(s===3 && m!==k && !EDGES[k][m]){ (far[m] = far[m] || []).push(n); } }));
+  const farList = Object.entries(far).sort((a,b)=>b[1].length-a[1].length || a[0].localeCompare(b[0])).slice(0,10);
+  const notes = nb.map(([n]) => [n, note(k,n)]).filter(x=>x[1]);
+  const inT = S.ticket.includes(k);
+  const chip = ([n,s]) => `<button class="pchip ${s===3?'classic':''}" data-open="${esc(n)}">${dot(n)}${esc(cap(n))}${MINE_PAIRS.has(pk(k,n)) ? ' <span class="mine">yours</span>' : ''}</button>`;
+  $('#detail').innerHTML = `
+    <div class="dhead">
+      <button class="btn ghost back" data-back style="align-self:flex-start;padding:5px 10px;font-size:13px">← All ingredients</button>
+      <span class="mono">${CATS[i.cat].n} · ${i.season.map(s=>SEASON_NAMES[s]).join(', ')}${MINE.has(k) ? ' · <span class="mine">your ingredient</span>' : ''}</span>
+      <h2>${esc(cap(k))}</h2>
+      <div class="meta">${i.tags.map(t=>`<span class="tag">${t}</span>`).join('')}${inSeason(k) && isProduce(k) ? '<span class="tag in">In season now</span>' : ''}${i.alias.length ? `<span class="mono" style="text-transform:none">also: ${i.alias.join(', ')}</span>` : ''}</div>
+      <div class="actions">
+        <button class="btn" data-add="${esc(k)}" ${inT?'disabled':''}>${inT ? 'On your ticket' : 'Add to combo'}</button>
+        <button class="btn accent" data-sparkfrom="${esc(k)}">Spark from ${esc(cap(k))}</button>
+        <button class="btn ghost" data-newpair="${esc(k)}">+ Add a pairing</button>
+        ${MINE.has(k) ? `<button class="btn ghost" data-editing="${esc(k)}">Edit ingredient</button>` : ''}
+      </div>
+    </div>
+    <div class="sec"><h3>Classic matches <span class="mono">${classic.length}</span></h3><div class="pairs">${classic.map(chip).join('') || '<span class="empty">None recorded yet.</span>'}</div></div>
+    <div class="sec"><h3>Also works <span class="mono">${good.length}</span></h3><div class="pairs">${good.map(chip).join('') || '<span class="empty">None recorded yet.</span>'}</div></div>
+    ${notes.length ? `<div class="sec"><h3>Kitchen notes</h3>${notes.map(([n,t])=>`<div class="note"><b>${esc(cap(k))} + ${esc(cap(n))}.</b> ${esc(t)}${MY_NOTES[pk(k,n)] ? ' <span class="mine">your note</span>' : ''} <button class="addchip" data-newpair="${esc(k)}" data-with="${esc(n)}" style="margin-left:4px">Edit</button></div>`).join('')}</div>` : ''}
+    ${farList.length ? `<div class="sec"><h3>Go further <span class="mono">one step removed</span></h3>
+      <p style="margin:0;font-size:14px;color:var(--muted)">Not a direct match, but each is a classic with two or more of ${cap(k)}'s classics. Good territory for something new.</p>
+      <div class="plist">${farList.map(([m,v])=>`<div class="prow"><span><button class="pchip" data-open="${m}">${dot(m)}${cap(m)}</button> <span style="color:var(--muted)">via ${v.slice(0,3).map(cap).join(', ')}</span></span><button class="addchip" data-trio="${k}|${m}|${v[0]}">Try the trio</button></div>`).join('')}</div></div>` : ''}
+  `;
+  $('#explore').classList.toggle('has-sel', mobile() && mobileShowDetail);
+}
+
+/* ---------- RENDER: COMBINE ---------- */
+function renderTicket(){
+  const t = S.ticket;
+  $('#ticketHead').textContent = `Ticket · ${t.length} item${t.length===1?'':'s'}`;
+  $('#ticketCount').textContent = t.length ? t.length : '';
+  $('#titems').innerHTML = t.length ? t.map((k,ix) => `<li class="titem"><span class="num">${String(ix+1).padStart(2,'0')}</span>${dot(k)}<button class="nm" data-open="${esc(k)}">${esc(cap(k))}</button><button class="x" data-remove="${esc(k)}" aria-label="Remove ${esc(k)}">×</button></li>`).join('')
+    : '<li class="empty">Empty ticket. Add an ingredient below, or tap “Add to combo” on any ingredient.</li>';
+  $('#addBest').disabled = !t.length;
+  renderAnalysis();
+}
+function renderAddSugg(){
+  const q = $('#addq').value.trim().toLowerCase();
+  if(!q){ $('#addsugg').innerHTML = ''; return; }
+  const m = KEYS.filter(k => !S.ticket.includes(k) && (k.includes(q) || ING[k].alias.some(a=>a.includes(q)))).slice(0,8);
+  $('#addsugg').innerHTML = m.map(k => `<button class="addchip" data-add="${k}" data-clearq>${dot(k)}${cap(k)}</button>`).join('') || '<span class="empty" style="padding:0">No match</span>';
+}
+function renderAnalysis(){
+  const t = S.ticket, el = $('#analysis');
+  if(t.length < 1){ el.innerHTML = `<div class="panel"><span class="mono">Nothing to analyse yet</span><p style="margin:0">Add two or more ingredients to see how they get along.</p></div>`; return; }
+  const h = harmony(t), bal = balanceOf(t), fixes = fixesFor(t), sp = sharedPartners(t);
+  const all = sp.filter(o => o.n === t.length).slice(0,18);
+  const most = t.length > 2 ? sp.filter(o => o.n === t.length-1).slice(0,12) : [];
+  const verdict = h.score === null ? 'Add a second ingredient' : h.score >= 90 ? 'Tight, proven combination' : h.score >= 70 ? 'Works well together' : h.score >= 50 ? 'Some untested links' : 'Experimental';
+  el.innerHTML = `
+    ${h.pairs.length ? `<div class="panel">
+      <div class="score"><div class="big">${h.score}<small>/100</small></div><div><div class="mono">Harmony</div><div style="font-weight:600">${verdict}</div></div></div>
+      <div class="plist">${h.pairs.map(([a,b,s]) => `<div class="prow"><span>${cap(a)} + ${cap(b)}${note(a,b)?`<br><span style="color:var(--muted);font-size:13px">${note(a,b)}</span>`:''}</span>${pillFor(s)}</div>`).join('')}</div>
+    </div>` : ''}
+    <div class="panel">
+      <span class="mono">Balance check · ${bal.filter(b=>b.on).length} of ${bal.length} covered</span>
+      <div class="balance">${bal.map(b=>`<div class="bal ${b.on?'on':''}"><i></i><span>${b.l}</span></div>`).join('')}</div>
+      ${fixes.filter(f=>f.c.length).length ? `<div class="stack" style="gap:8px">${fixes.filter(f=>f.c.length).map(f=>`<div class="fix"><b>Needs ${f.b.l.toLowerCase()}</b>${f.c.map(o=>`<button class="addchip" data-add="${o.k}">${dot(o.k)}${cap(o.k)} <em>${o.n}/${t.length}</em></button>`).join('')}</div>`).join('')}</div>` : '<p style="margin:0;font-size:14px">Every element is covered.</p>'}
+    </div>
+    <div class="panel">
+      <span class="mono">${t.length===1 ? 'Pairs with '+cap(t[0]) : 'Pairs with everything on the ticket'} · ${all.length}</span>
+      <div class="pairs">${all.map(o=>`<button class="addchip" data-add="${o.k}">${dot(o.k)}${cap(o.k)}</button>`).join('') || '<span class="empty" style="padding:0">Nothing links to all of them. Look at the next group, or remove an outlier.</span>'}</div>
+      ${most.length ? `<span class="mono" style="margin-top:6px">Pairs with all but one · ${most.length}</span><div class="pairs">${most.map(o=>`<button class="addchip" data-add="${o.k}">${dot(o.k)}${cap(o.k)}</button>`).join('')}</div>` : ''}
+    </div>`;
+}
+
+/* ---------- RENDER: SPARK ---------- */
+function renderSparkControls(){
+  document.querySelectorAll('#sizeSeg button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.size === S.opts.size));
+  document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === S.opts.mode));
+  document.querySelectorAll('#seasonSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === S.opts.season));
+  $('#hero').value = S.opts.hero || '';
+}
+function renderSpark(){
+  const sp = S.spark; if(!sp) return;
+  const it = sp.items, h = harmony(it), bal = balanceOf(it);
+  const linkRows = it.slice(1).map((k, ix) => {
+    let v = (sp.via || {})[k];
+    if(!v){ let l = it.slice(0, ix+1).filter(c => str(c,k) > 0); if(!l.length) l = it.filter(c => c !== k && str(c,k) > 0); v = {links:l}; }
+    if(!v.links.length) return `<div class="wrow">${pillFor(0)}<span><b>${cap(k)}</b> untested with the rest</span></div>`;
+    const best = v.links.slice().sort((a,b)=>str(b,k)-str(a,k));
+    return `<div class="wrow">${pillFor(str(best[0],k))}<span><b>${cap(k)}</b> ${v.wild ? `<span class="wild">wildcard</span> bridged through ${cap(best[0])}` : `with ${best.map(cap).join(', ')}`}</span></div>`;
+  }).join('');
+  const notesHere = h.pairs.filter(p=>note(p[0],p[1])).slice(0,2);
+  $('#sparkCard').innerHTML = `<article class="card">
+    <div class="card-top">
+      <span class="mono">${cap(sp.mode)} · ${it.length} ingredients · harmony ${h.score}</span>
+      <div class="combo-line">${it.map((k,ix)=>`${ix?'<span class="plus">+</span>':''}<button data-open="${k}">${cap(k)}</button>`).join('')}</div>
+      <div class="prompt"><b>${sp.technique}</b>, and make it a <b>${sp.format}</b>.</div>
+    </div>
+    <div class="why">
+      <div class="sub"><span class="mono">Why it works</span>${linkRows}</div>
+      <div class="sub"><span class="mono">Balance · ${bal.filter(b=>b.on).length}/${bal.length}</span>
+        <div class="balance" style="grid-template-columns:repeat(5,1fr)">${bal.map(b=>`<div class="bal ${b.on?'on':''}"><i style="height:16px"></i><span>${b.l}</span></div>`).join('')}</div>
+        ${notesHere.map(p=>`<div class="note" style="font-size:13px">${note(p[0],p[1])}</div>`).join('')}
+      </div>
+    </div>
+    <div class="card-actions">
+      <button class="btn" data-totick>Open in combo builder</button>
+      <button class="btn ghost" data-savespark>Save</button>
+      <button class="btn ghost" data-copyspark>${shareWord()}</button>
+    </div>
+  </article>`;
+  $('#hist').innerHTML = S.history.length ? S.history.map((s,ix)=>`<button class="hbtn" data-hist="${ix}">${s.items.map(cap).join(' + ')}<small>${s.technique} · ${s.format}</small></button>`).join('') : '<span class="empty" style="padding:0">Your last sparks will collect here.</span>';
+}
+function fire(){
+  Native.tap();
+  if(S.spark){ S.history.unshift(S.spark); S.history = S.history.slice(0,8); }
+  S.spark = makeSpark(); renderSpark();
+}
+
+/* ---------- RENDER: MY BOOK ---------- */
+function renderBook(){
+  $('#savedCount').textContent = S.saved.length ? S.saved.length : '';
+  const saved = S.saved.map((s,ix)=>({s, ix, items:s.items.filter(k=>ING[k])})).filter(o=>o.items.length);
+  const mineIng = [...MINE].sort();
+  const minePairs = [...MINE_PAIRS].sort();
+  const hours = Array.from({length:24},(_,h)=>h);
+  const fmtH = h => new Date(2000,0,1,h).toLocaleTimeString(undefined,{hour:'numeric'});
+  $('#book').innerHTML = `
+    <section class="stack">
+      <div class="bh"><h3>Saved combos <span class="mono">${saved.length}</span></h3></div>
+      ${saved.length ? `<div class="saved">${saved.map(({s,ix,items})=>`<div class="scard">
+        <span class="mono">${new Date(s.ts).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · harmony ${harmony(items).score ?? '–'}</span>
+        <h3>${items.map(k=>esc(cap(k))).join(' + ')}</h3>
+        ${s.prompt ? `<p>${esc(s.prompt)}</p>` : ''}
+        <div class="actions"><button class="btn sm" data-loadsaved="${ix}">Open</button><button class="btn ghost sm" data-copysaved="${ix}">${shareWord()}</button><button class="btn ghost sm" data-delsaved="${ix}">Delete</button></div>
+      </div>`).join('')}</div>` : `<p class="hint">Tap Save on a spark or on your combo ticket and it lands here.</p>`}
+    </section>
+    <section class="stack">
+      <div class="bh"><h3>Your ingredients <span class="mono">${mineIng.length}</span></h3><button class="btn sm" data-newing>+ New ingredient</button></div>
+      ${mineIng.length ? `<div class="list">${mineIng.map(k=>`<div class="lrow">${dot(k)}<button class="nm grow" data-open="${esc(k)}" style="background:none;border:0;padding:0;text-align:left;font-weight:600">${esc(cap(k))}</button><span class="sub">${deg(k)} pairings</span><button class="btn ghost sm" data-editing="${esc(k)}">Edit</button></div>`).join('')}</div>`
+        : `<p class="hint">Add the things you cook with that aren't here yet: a local farm's variety, a house ferment, a spice blend. They join the pairing map, the combo builder and Spark.</p>`}
+    </section>
+    <section class="stack">
+      <div class="bh"><h3>Your pairings <span class="mono">${minePairs.length}</span></h3></div>
+      ${minePairs.length ? `<div class="list">${minePairs.map(key=>{ const [a,b]=key.split('+'); return `<div class="lrow"><span class="grow">${dot(a)} ${esc(cap(a))} + ${dot(b)} ${esc(cap(b))}${MY_NOTES[key] ? `<br><span class="sub">${esc(MY_NOTES[key])}</span>` : ''}</span>${pillFor(str(a,b))}<button class="btn ghost sm" data-newpair="${esc(a)}" data-with="${esc(b)}">Edit</button></div>`; }).join('')}</div>`
+        : `<p class="hint">Open any ingredient and tap “Add a pairing” to record your own matches and notes.</p>`}
+    </section>
+    ${Native.on ? `<section class="stack">
+      <div class="bh"><h3>Daily spark</h3></div>
+      <p class="hint">A new in-season combination as a notification each day.</p>
+      <div class="controls" style="margin:0">
+        <div class="seg"><button data-daily="on" aria-pressed="${S.daily.on}">On</button><button data-daily="off" aria-pressed="${!S.daily.on}">Off</button></div>
+        <label class="ctl"><span class="mono">Time</span><select id="dailyHour">${hours.map(h=>`<option value="${h}" ${h===S.daily.hour?'selected':''}>${fmtH(h)}</option>`).join('')}</select></label>
+      </div>
+    </section>` : ''}
+    <section class="stack">
+      <div class="bh"><h3>Backup &amp; share</h3></div>
+      <p class="hint">Export your ingredients, pairings, notes and saved combos as text. Keep it somewhere safe or send it to your team, then paste it back here to import.</p>
+      <div class="actions"><button class="btn" data-export>${Native.on ? 'Share backup' : 'Copy backup'}</button></div>
+      <textarea id="importText" rows="3" placeholder="Paste a Flavour Atlas backup here"></textarea>
+      <div class="actions"><button class="btn ghost" data-import>Import</button></div>
+    </section>
+    <section class="stack">
+      <div class="bh"><h3>About</h3></div>
+      <p class="hint">Flavour Atlas · ${KEYS.length} ingredients · ${KEYS.reduce((s,k)=>s+deg(k),0)/2} pairings. Plant-forward pairings for cooks. Everything you add stays on this device; there are no accounts and nothing is tracked or sent anywhere.</p>
+    </section>`;
+}
+
+/* ---------- SHEETS: your own ingredients and pairings ---------- */
+const ALL_TAGS = ['sweet','sour','salty','umami','bitter','rich','heat','fresh','crunch','earthy','aromatic','smoky','floral'];
+let F = null;
+function openSheet(){ $('#sheet').hidden = false; document.body.classList.add('locked'); renderSheet(); setTimeout(()=>{ const i = $('#sheet input'); if(i && !Native.on) i.focus(); }, 60); }
+function closeSheet(){ $('#sheet').hidden = true; document.body.classList.remove('locked'); F = null; }
+function ingForm(name, presetName){
+  const ex = name && CUSTOM.ingredients.find(c=>c.name===name);
+  F = {type:'ing', editing: !!ex, orig: ex ? name : '', name: ex ? name : (presetName || ''), cat: ex ? ex.cat : 'V', tags: ex ? ex.tags.slice() : [], season: ex ? ex.season.slice() : ['yr'],
+       pairs: ex ? Object.keys(EDGES[name]||{}).filter(n=>MINE_PAIRS.has(pk(name,n))).map(n=>[n, str(name,n)]) : [], q:''};
+  openSheet();
+}
+function pairForm(a, b){
+  F = {type:'pair', a, b: b || '', s: b ? (str(a,b) || 3) : 3, note: b ? (MY_NOTES[pk(a,b)] || '') : '', q:''};
+  openSheet();
+}
+function pairSugg(q, exclude){
+  q = (q||'').trim().toLowerCase(); if(!q) return '<span class="hint">Start typing to search the atlas.</span>';
+  const m = KEYS.filter(k => !exclude.includes(k) && (k.includes(q) || ING[k].alias.some(a=>a.includes(q)))).slice(0,10);
+  return m.map(k=>`<button class="addchip" data-act="pick" data-v="${esc(k)}">${dot(k)}${esc(cap(k))}</button>`).join('') || '<span class="hint">No match in the atlas. Add it as your own ingredient first.</span>';
+}
+function renderSheet(){
+  if(!F) return; let h = '';
+  if(F.type === 'pair'){
+    h = `<div class="sh-head"><h2 id="sheetTitle">${F.b && str(F.a,F.b) ? 'Edit pairing' : 'Add a pairing'}</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
+      <div class="fpicked">${dot(F.a)}${esc(cap(F.a))} <span style="color:var(--accent)">+</span> ${F.b ? `${dot(F.b)}${esc(cap(F.b))} <button class="btn ghost sm" data-act="unpick">Change</button>` : ''}</div>
+      ${F.b ? '' : `<div class="field"><input class="search" id="fpq" placeholder="Pair it with…" value="${esc(F.q)}" autocomplete="off" aria-label="Search for a pairing"><div class="sugg" id="fpsugg">${pairSugg(F.q,[F.a])}</div></div>`}
+      <div class="field"><span class="mono">How strong</span><div class="seg" style="align-self:flex-start"><button data-act="str" data-v="3" aria-pressed="${F.s===3}">Classic</button><button data-act="str" data-v="2" aria-pressed="${F.s===2}">Good</button></div></div>
+      <label class="field" for="fnote"><span class="mono">Your note (optional)</span><textarea id="fnote" rows="3" placeholder="How you'd use it on the line…">${esc(F.note)}</textarea></label>
+      <div class="actions"><button class="btn accent" data-act="savepair" ${F.b ? '' : 'disabled'}>Save pairing</button>${F.b && (MINE_PAIRS.has(pk(F.a,F.b)) || MY_NOTES[pk(F.a,F.b)]) ? '<button class="btn ghost" data-act="delpair">Remove my changes</button>' : ''}</div>`;
+  } else {
+    h = `<div class="sh-head"><h2 id="sheetTitle">${F.editing ? 'Edit ingredient' : 'New ingredient'}</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
+      <label class="field" for="fname"><span class="mono">Name</span><input class="search" id="fname" value="${esc(F.name)}" placeholder="e.g. smoked beet, house XO, spruce tips" autocomplete="off"></label>
+      <div class="field"><span class="mono">Category</span><div class="chips">${Object.entries(CATS).map(([c,v])=>`<button class="chip" data-act="cat" data-v="${c}" aria-pressed="${F.cat===c}"><span class="dot" style="--c:${v.c}"></span>${v.n}</button>`).join('')}</div></div>
+      <div class="field"><span class="mono">Taste &amp; texture · feeds the balance check</span><div class="chips">${ALL_TAGS.map(t=>`<button class="chip" data-act="tag" data-v="${t}" aria-pressed="${F.tags.includes(t)}">${t}</button>`).join('')}</div></div>
+      <div class="field"><span class="mono">Season</span><div class="chips">${Object.entries(SEASON_NAMES).map(([c,n])=>`<button class="chip" data-act="season" data-v="${c}" aria-pressed="${F.season.includes(c)}">${n}</button>`).join('')}</div></div>
+      <div class="field"><span class="mono">Pairs with · ${F.pairs.length} · tap a strength to switch</span>
+        <div class="pairs">${F.pairs.map(([n,st],ix)=>`<span class="fpair ${st===3?'classic':''}">${dot(n)}${esc(cap(n))}<button data-act="pstr" data-v="${ix}">${st===3?'Classic':'Good'}</button><button data-act="prm" data-v="${ix}" aria-label="Remove ${esc(n)}">×</button></span>`).join('')}</div>
+        <input class="search" id="fpq" placeholder="Add a pairing…" value="${esc(F.q)}" autocomplete="off" aria-label="Search for a pairing">
+        <div class="sugg" id="fpsugg">${pairSugg(F.q, [F.orig, ...F.pairs.map(p=>p[0])])}</div></div>
+      <div class="actions"><button class="btn accent" data-act="saveing">Save ingredient</button>${F.editing ? '<button class="btn ghost" data-act="deling">Delete ingredient</button>' : ''}</div>`;
+  }
+  $('#sheetBody').innerHTML = h;
+}
+function cleanName(n){ return (n||'').toLowerCase().replace(/[|*,<>"`]/g,'').replace(/\s+/g,' ').trim().slice(0,40); }
+function saveCustom(){ store.set('custom', CUSTOM); buildGraph(); renderAll(); }
+function renameRefs(from, to){
+  S.ticket = S.ticket.map(k => k===from ? to : k);
+  S.saved.forEach(s => { s.items = s.items.map(k => k===from ? to : k); });
+  if(S.sel === from) S.sel = to;
+  const n = {}; Object.entries(CUSTOM.notes).forEach(([key,t]) => { const [a,b] = key.split('+'); n[pk(a===from?to:a, b===from?to:b)] = t; }); CUSTOM.notes = n;
+}
+function sheetAct(act, v){
+  if(!F && act !== 'close') return;
+  switch(act){
+    case 'close': return closeSheet();
+    case 'pick':
+      if(F.type === 'pair'){ F.b = v; F.s = str(F.a, v) || 3; F.note = MY_NOTES[pk(F.a, v)] || ''; F.q = ''; }
+      else { F.pairs.push([v, 2]); F.q = ''; }
+      renderSheet(); if(F.type === 'ing'){ const i = $('#fpq'); if(i) i.focus(); } return;
+    case 'unpick': F.b = ''; return renderSheet();
+    case 'str': F.s = +v; return renderSheet();
+    case 'cat': F.cat = v; return renderSheet();
+    case 'tag': F.tags = F.tags.includes(v) ? F.tags.filter(t=>t!==v) : F.tags.concat(v); return renderSheet();
+    case 'season': if(v === 'yr') F.season = ['yr']; else { F.season = F.season.filter(t=>t!=='yr'); F.season = F.season.includes(v) ? F.season.filter(t=>t!==v) : F.season.concat(v); } return renderSheet();
+    case 'pstr': F.pairs[+v][1] = F.pairs[+v][1] === 3 ? 2 : 3; return renderSheet();
+    case 'prm': F.pairs.splice(+v, 1); return renderSheet();
+    case 'savepair': {
+      if(!F.b) return; const key = pk(F.a, F.b);
+      CUSTOM.pairs = CUSTOM.pairs.filter(([a,b]) => pk(a,b) !== key);
+      CUSTOM.pairs.push([F.a, F.b, F.s]);
+      if(F.note.trim()) CUSTOM.notes[key] = F.note.trim().slice(0,400); else delete CUSTOM.notes[key];
+      const a = F.a; closeSheet(); saveCustom(); Native.thud(); toast('Pairing saved'); if(S.view==='explore'){ S.sel = a; renderDetail(); } return;
+    }
+    case 'delpair': {
+      const key = pk(F.a, F.b);
+      CUSTOM.pairs = CUSTOM.pairs.filter(([a,b]) => pk(a,b) !== key); delete CUSTOM.notes[key];
+      closeSheet(); saveCustom(); toast('Removed'); return;
+    }
+    case 'saveing': {
+      const name = cleanName(F.name);
+      if(!name) return toast('Give it a name first');
+      if(name !== F.orig && ING[name]) return toast(cap(name) + ' is already in the atlas. Add pairings to it instead.');
+      if(F.orig){
+        CUSTOM.ingredients = CUSTOM.ingredients.filter(c => c.name !== F.orig);
+        CUSTOM.pairs = CUSTOM.pairs.filter(([a,b]) => a !== F.orig && b !== F.orig);
+        if(name !== F.orig) renameRefs(F.orig, name);
+      }
+      CUSTOM.ingredients.push({name, cat:F.cat, tags:F.tags.length ? F.tags : ['earthy'], season:F.season.length ? F.season : ['yr']});
+      F.pairs.forEach(([n,st]) => { if(n !== name) CUSTOM.pairs.push([name, n, st]); });
+      closeSheet(); saveCustom(); persist(); Native.thud(); toast(cap(name) + ' saved'); openIng(name); return;
+    }
+    case 'deling': {
+      const n = F.orig;
+      CUSTOM.ingredients = CUSTOM.ingredients.filter(c => c.name !== n);
+      CUSTOM.pairs = CUSTOM.pairs.filter(([a,b]) => a !== n && b !== n);
+      Object.keys(CUSTOM.notes).forEach(k => { if(k.split('+').includes(n)) delete CUSTOM.notes[k]; });
+      S.ticket = S.ticket.filter(k => k !== n); if(S.sel === n) S.sel = 'tomato';
+      closeSheet(); saveCustom(); persist(); toast('Deleted'); return;
+    }
+  }
+}
+
+/* ---------- DAILY SPARK NOTIFICATIONS (native only) ---------- */
+async function scheduleDaily(){
+  const LN = Native.plugin('LocalNotifications'); if(!LN) return;
+  try {
+    const pend = await LN.getPending();
+    if(pend && pend.notifications && pend.notifications.length) await LN.cancel({notifications: pend.notifications.map(n=>({id:n.id}))});
+    if(!S.daily.on) return;
+    let perm = await LN.checkPermissions();
+    if(perm.display !== 'granted') perm = await LN.requestPermissions();
+    if(perm.display !== 'granted'){ S.daily.on = false; store.set('daily', S.daily); renderBook(); toast('Turn on notifications for Flavour Atlas in Settings'); return; }
+    const now = new Date(), list = [];
+    for(let d = 0; d < 14; d++){
+      const at = new Date(now); at.setDate(now.getDate() + d); at.setHours(S.daily.hour, 0, 0, 0);
+      if(at <= now) continue;
+      const sp = makeSpark({size:3, mode:'balanced', hero:'', season:'now'});
+      list.push({id: 1000 + d, title: 'Today\'s flavour spark', body: `${sp.items.map(cap).join(' + ')}. ${sp.technique}, as a ${sp.format}.`, schedule: {at, allowWhileIdle: true}, extra: {items: sp.items, technique: sp.technique, format: sp.format}});
+    }
+    if(list.length) await LN.schedule({notifications: list});
+  } catch(e){ console.warn('daily spark', e); }
+}
+
+/* ---------- BACKUP ---------- */
+function exportData(){ return JSON.stringify({app:'flavour-atlas', v:1, custom:CUSTOM, saved:S.saved}); }
+function importData(txt){
+  let d; try { d = JSON.parse(txt.trim()); } catch(e){ return toast('That does not look like a Flavour Atlas backup'); }
+  if(!d || d.app !== 'flavour-atlas' || !d.custom) return toast('That does not look like a Flavour Atlas backup');
+  const c = d.custom; let added = 0;
+  (c.ingredients||[]).forEach(i => { const n = cleanName(i.name); if(n && !CUSTOM.ingredients.find(x=>x.name===n) && !(ING[n] && !MINE.has(n))){ CUSTOM.ingredients.push({name:n, cat:CATS[i.cat]?i.cat:'V', tags:(i.tags||[]).filter(t=>ALL_TAGS.includes(t)), season:(i.season||[]).filter(t=>SEASON_NAMES[t])}); added++; } });
+  (c.pairs||[]).forEach(([a,b,s]) => { a = cleanName(a); b = cleanName(b); if(!a || !b) return; const key = pk(a,b); CUSTOM.pairs = CUSTOM.pairs.filter(([x,y]) => pk(x,y) !== key); CUSTOM.pairs.push([a, b, s===3?3:2]); added++; });
+  Object.entries(c.notes||{}).forEach(([k,t]) => { if(typeof t === 'string') CUSTOM.notes[k] = t.slice(0,400); });
+  (d.saved||[]).forEach(s => { if(s && Array.isArray(s.items)) S.saved.push({items:s.items.map(cleanName), prompt:String(s.prompt||'').slice(0,200), ts:s.ts||Date.now()}); });
+  saveCustom(); persist(); toast(`Imported ${added} item${added===1?'':'s'}`);
+}
+
+/* ---------- VIEW SWITCHING ---------- */
+const VIEWS = ['explore','combine','spark','saved'];
+function renderAll(){
+  if(!ING[S.sel]) S.sel = KEYS[0];
+  S.ticket = S.ticket.filter(k => ING[k]);
+  $('#statline').textContent = `${KEYS.length} ingredients · ${KEYS.reduce((s,k)=>s+deg(k),0)/2} pairings`;
+  $('#hero').innerHTML = '<option value="">Any ingredient</option>' + KEYS.map(k=>`<option value="${esc(k)}">${esc(cap(k))}</option>`).join('');
+  $('#hero').value = S.opts.hero && ING[S.opts.hero] ? S.opts.hero : '';
+  renderCats(); renderGrid(); renderDetail(); renderTicket(); renderBook();
+  $('#copyTicket').textContent = shareWord();
+}
+function show(v){
+  if(!VIEWS.includes(v)) v = 'explore';
+  S.view = v;
+  VIEWS.forEach(x => { $('#view-'+x).classList.toggle('on', x===v); $('#tab-'+x).setAttribute('aria-current', x===v ? 'page' : 'false'); });
+  if(location.hash !== '#'+v){ try { history.replaceState(null,'','#'+v); } catch(e){ location.hash = v; } }
+  if(v === 'spark' && !S.spark) fire();
+  window.scrollTo(0,0);
+}
+function persist(){ store.set('ticket', S.ticket); store.set('saved', S.saved); store.set('opts', S.opts); store.set('sel', S.sel); store.set('daily', S.daily); }
+function openIng(k){
+  S.sel = k; mobileShowDetail = true; persist();
+  renderGrid(); renderDetail();
+  if(S.view !== 'explore') show('explore');
+  if(!mobile()) $('#detail').scrollTop = 0; else window.scrollTo(0,0);
+}
+function addToTicket(k){
+  if(!S.ticket.includes(k)){ Native.tap(); S.ticket.push(k); persist(); renderTicket(); renderDetail(); toast(cap(k)+' added to combo'); }
+}
+
+/* ---------- EVENTS ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b){ if(e.target.id === 'sheet') closeSheet(); return; }
+  const d = b.dataset;
+  if(d.act) return sheetAct(d.act, d.v);
+  if(d.newing !== undefined){ return ingForm(null, d.newing || ''); }
+  if(d.editing) return ingForm(d.editing);
+  if(d.newpair) return pairForm(d.newpair, d.with);
+  if(d.daily){ S.daily.on = d.daily === 'on'; persist(); renderBook(); scheduleDaily(); if(S.daily.on) toast('Daily spark is on'); return; }
+  if('export' in d){ copy(exportData()); return; }
+  if('import' in d){ const t = $('#importText').value; if(t.trim()) importData(t); return; }
+  if(d.view) return show(d.view);
+  if(d.cat){ S.cat = d.cat; renderCats(); renderGrid(); return; }
+  if('seasonToggle' in d){ S.seasonal = !S.seasonal; renderCats(); renderGrid(); return; }
+  if(d.open) return openIng(d.open);
+  if('back' in d){ mobileShowDetail = false; renderDetail(); return; }
+  if(d.add){ addToTicket(d.add); if('clearq' in d){ $('#addq').value=''; renderAddSugg(); $('#addq').focus(); } return; }
+  if(d.remove){ S.ticket = S.ticket.filter(x=>x!==d.remove); persist(); renderTicket(); renderDetail(); return; }
+  if(d.trio){ S.ticket = d.trio.split('|'); persist(); renderTicket(); renderDetail(); show('combine'); return; }
+  if(d.sparkfrom){ S.opts.hero = d.sparkfrom; persist(); renderSparkControls(); show('spark'); fire(); return; }
+  if(d.size){ S.opts.size = +d.size; persist(); renderSparkControls(); fire(); return; }
+  if(d.mode){ S.opts.mode = d.mode; persist(); renderSparkControls(); fire(); return; }
+  if(d.s){ S.opts.season = d.s; persist(); renderSparkControls(); fire(); return; }
+  if('totick' in d){ S.ticket = S.spark.items.slice(); persist(); renderTicket(); renderDetail(); show('combine'); return; }
+  if('savespark' in d){ S.saved.unshift({items:S.spark.items, prompt:`${S.spark.technique}, as a ${S.spark.format}.`, ts:Date.now()}); persist(); renderBook(); Native.thud(); toast('Saved'); return; }
+  if('copyspark' in d){ copy(comboText(S.spark.items, `${S.spark.technique}, as a ${S.spark.format}.`)); return; }
+  if(d.hist !== undefined){ const h = S.history.splice(+d.hist,1)[0]; if(S.spark) S.history.unshift(S.spark); S.spark = h; renderSpark(); window.scrollTo(0,0); return; }
+  if(d.loadsaved !== undefined){ S.ticket = S.saved[+d.loadsaved].items.slice(); persist(); renderTicket(); show('combine'); return; }
+  if(d.copysaved !== undefined){ const s = S.saved[+d.copysaved]; copy(comboText(s.items, s.prompt)); return; }
+  if(d.delsaved !== undefined){ S.saved.splice(+d.delsaved,1); persist(); renderBook(); return; }
+});
+$('#fire').addEventListener('click', fire);
+$('#hero').addEventListener('change', e => { S.opts.hero = e.target.value; persist(); fire(); });
+$('#q').addEventListener('input', e => { S.q = e.target.value; renderGrid(); });
+$('#q').addEventListener('keydown', e => { if(e.key === 'Enter'){ const f = filtered(); if(f.length) openIng(f[0]); } });
+$('#addq').addEventListener('input', renderAddSugg);
+$('#addq').addEventListener('keydown', e => { if(e.key === 'Enter'){ const btn = $('#addsugg [data-add]'); if(btn) btn.click(); } });
+$('#clearTicket').addEventListener('click', () => { S.ticket = []; persist(); renderTicket(); renderDetail(); });
+$('#addBest').addEventListener('click', () => {
+  const sp = sharedPartners(S.ticket); if(!sp.length) return;
+  const topN = sp[0].n; const top = sp.filter(o=>o.n===topN).slice(0,6);
+  addToTicket(weightedPick(top, o=>o.score).k);
+});
+$('#saveTicket').addEventListener('click', () => { if(!S.ticket.length) return toast('Ticket is empty'); S.saved.unshift({items:S.ticket.slice(), prompt:'', ts:Date.now()}); persist(); renderBook(); Native.thud(); toast('Saved'); });
+$('#copyTicket').addEventListener('click', () => { if(!S.ticket.length) return toast('Ticket is empty'); copy(comboText(S.ticket)); });
+window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+document.addEventListener('input', e => {
+  if(!F) return;
+  if(e.target.id === 'fpq'){ F.q = e.target.value; const box = $('#fpsugg'); if(box) box.innerHTML = F.type === 'pair' ? pairSugg(F.q,[F.a]) : pairSugg(F.q,[F.orig, ...F.pairs.map(p=>p[0])]); }
+  if(e.target.id === 'fname') F.name = e.target.value;
+  if(e.target.id === 'fnote') F.note = e.target.value;
+});
+document.addEventListener('change', e => { if(e.target.id === 'dailyHour'){ S.daily.hour = +e.target.value; persist(); scheduleDaily(); } });
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && F) closeSheet(); });
+window.addEventListener('resize', () => $('#explore').classList.toggle('has-sel', mobile() && mobileShowDetail));
+
+/* ---------- INIT ---------- */
+async function boot(){
+  await store.load();
+  initState();
+  renderAll(); renderSparkControls();
+  S.spark = makeSpark(); renderSpark();
+  show(location.hash.slice(1) || 'explore');
+  if(Native.on){
+    document.documentElement.classList.add('native');
+    const LN = Native.plugin('LocalNotifications');
+    if(LN){ try { LN.addListener('localNotificationActionPerformed', a => {
+      const x = a && a.notification && a.notification.extra;
+      if(x && x.items){ const items = x.items.filter(k => ING[k]); if(items.length){ if(S.spark) S.history.unshift(S.spark); S.spark = {items, via:{}, technique:x.technique, format:x.format, mode:'balanced'}; renderSpark(); show('spark'); } }
+    }); } catch(e){} }
+    scheduleDaily();
+    const SB = Native.plugin('StatusBar'); if(SB){ try { SB.setOverlaysWebView({overlay:true}); } catch(e){} }
+    const SP = Native.plugin('SplashScreen'); if(SP){ try { SP.hide(); } catch(e){} }
+  }
+  window.__ready = true;
+}
+boot();
+</script>
+</body>
+</html>
